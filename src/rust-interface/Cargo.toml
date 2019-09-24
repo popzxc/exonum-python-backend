@@ -1,0 +1,11 @@
+[package]
+name = "rust-interface"
+version = "0.1.0"
+authors = ["Igor Aleksanov <popzxc@yandex.ru>"]
+edition = "2018"
+
+[lib]
+name = "raytracer_ffi"
+crate-type = ["dylib"]
+
+[dependencies]
