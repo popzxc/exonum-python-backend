@@ -14,20 +14,9 @@ lazy_static! {
         RwLock::new(PythonRuntimeInterface::default());
 }
 
-// TODO have an enum to return statuses.
-type PythonDeployArtifactMethod = unsafe extern "C" fn(
-    artifact: PythonArtifactId,
-    spec: *const u8,
-    spec_len: usize,
-) -> PythonResult;
-type PythonIsArtifactDeployedMethod = unsafe extern "C" fn(artifact: PythonArtifactId) -> bool;
-type PythonStartServiceMethod = unsafe extern "C" fn(spec: PythonInstanceSpec) -> PythonResult;
-
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PythonRuntimeInterface {
-    pub deploy_artifact: PythonDeployArtifactMethod,
-    pub is_artifact_deployed: PythonIsArtifactDeployedMethod,
-    pub start_service: PythonStartServiceMethod,
+    pub methods: PythonMethods,
 
     pub(in crate::python_interface) ongoing_deployments: BTreeMap<ArtifactId, PendingDeployment>,
 }
@@ -42,17 +31,45 @@ impl PythonRuntimeInterface {
     }
 }
 
-impl Default for PythonRuntimeInterface {
+// Types of the stored functions.
+type PythonDeployArtifactMethod = unsafe extern "C" fn(
+    artifact: PythonArtifactId,
+    spec: *const u8,
+    spec_len: usize,
+) -> PythonResult;
+type PythonIsArtifactDeployedMethod = unsafe extern "C" fn(artifact: PythonArtifactId) -> bool;
+type PythonStartServiceMethod = unsafe extern "C" fn(spec: PythonInstanceSpec) -> PythonResult;
+
+/// Structure with the Python side API.
+#[repr(C)]
+#[derive(Debug)]
+pub struct PythonMethods {
+    pub deploy_artifact: PythonDeployArtifactMethod,
+    pub is_artifact_deployed: PythonIsArtifactDeployedMethod,
+    pub start_service: PythonStartServiceMethod,
+}
+
+impl Default for PythonMethods {
     fn default() -> Self {
         Self {
             deploy_artifact: default_deploy,
             is_artifact_deployed: default_is_artifact_deployed,
             start_service: default_start_service,
-            ongoing_deployments: Default::default(),
         }
     }
 }
 
+/// Initialize python interfaces.
+/// This function is meant to be called by the python side during the initialization.
+#[no_mangle]
+fn init_python_side(methods: PythonMethods) {
+    let mut python_interface = PYTHON_INTERFACE.write().expect("Excepted write");
+
+    (*python_interface).methods = methods;
+}
+
+/// Removes an artifact from the pending deployments.
+/// This function is meant to be called by the python after the deployment of the artifact.
 #[no_mangle]
 fn deployment_completed(python_artifact: PythonArtifactId, result: PythonResult) {
     let artifact = ArtifactId::from(python_artifact);

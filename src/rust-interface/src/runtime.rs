@@ -39,22 +39,23 @@ impl Runtime for PythonRuntime {
 
         let spec_bytes = spec.to_bytes();
 
-        let deploy_artifact_fn = python_interface.deploy_artifact;
-
+        // Call the python side of `deploy_artifact`.
         let result = unsafe {
             let python_artifact_id = PythonArtifactId::from_artifact_id(&artifact);
             let (spec_bytes_ptr, spec_bytes_len) = into_ptr_and_len(&spec_bytes);
-            deploy_artifact_fn(python_artifact_id, spec_bytes_ptr, spec_bytes_len)
+            (python_interface.methods.deploy_artifact)(python_artifact_id, spec_bytes_ptr, spec_bytes_len)
         };
 
+        // Look at the result.
         if result.success {
-            // TODO actually use a future
+            // Everything is ok, deployment started, create a future and return it.
             let deployment_future = PendingDeployment::new();
 
             python_interface.notify_deployment_started(artifact, deployment_future.clone());
 
             Box::new(deployment_future)
         } else {
+            // Something went wrong on the initial stage, did not even stert.
             let error = PythonRuntimeError::from_value(result.error_code);
 
             Box::new(Err(error.into()).into_future())
@@ -65,10 +66,9 @@ impl Runtime for PythonRuntime {
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
-        let is_artifact_deployed_fn = python_interface.is_artifact_deployed;
         unsafe {
             let python_artifact_id = PythonArtifactId::from_artifact_id(id);
-            is_artifact_deployed_fn(python_artifact_id)
+            (python_interface.methods.is_artifact_deployed)(python_artifact_id)
         }
     }
 
@@ -76,13 +76,16 @@ impl Runtime for PythonRuntime {
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
-        let start_service_fn = python_interface.start_service;
-        // TODO return either Ok or Err depending on python return value.
-        unsafe {
+        let result = unsafe {
             let python_instance_spec = PythonInstanceSpec::from_instance_spec(spec);
 
-            start_service_fn(python_instance_spec);
+            (python_interface.methods.start_service)(python_instance_spec)
+        };
+
+        if result.success {
             Ok(())
+        } else {
+            Err(PythonRuntimeError::from_value(result.error_code).into())
         }
     }
 
