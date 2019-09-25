@@ -1,28 +1,45 @@
-use std::ffi::CStr;
-use std::os::raw::c_char;
+// use std::ffi::CStr;
 
-#[repr(C)]
-pub struct PythonArtifactId {
-    pub runtim_ide: u32,
-    pub name: *const c_char,
-}
-
-#[repr(C)]
-pub struct PythonInstanceSpec {
-    pub name: *const c_char,
-    pub artifact: PythonArtifactId,
-}
+use super::types::{PythonArtifactId, PythonInstanceSpec};
 
 // TODO have an enum to return statuses.
-type PythonDeployArtifactMethod = unsafe extern "C" fn(artifact: PythonArtifactId, spec: *const u8);
+type PythonDeployArtifactMethod =
+    unsafe extern "C" fn(artifact: PythonArtifactId, spec: *const u8, spec_len: usize);
 type PythonIsArtifactDeployedMethod = unsafe extern "C" fn(artifact: PythonArtifactId) -> bool;
 type PythonStartServiceMethod = unsafe extern "C" fn(spec: PythonInstanceSpec);
-// type PythonConfigureService = unsafe extern "C"
 
-#[repr(C)]
 #[derive(Debug)]
 pub struct PythonRuntimeInterface {
     pub deploy_artifact: PythonDeployArtifactMethod,
-    pub is_artifact_deployes: PythonIsArtifactDeployedMethod,
+    pub is_artifact_deployed: PythonIsArtifactDeployedMethod,
     pub start_service: PythonStartServiceMethod,
+}
+
+impl Default for PythonRuntimeInterface {
+    fn default() -> Self {
+        Self {
+            deploy_artifact: default_deploy,
+            is_artifact_deployed: default_is_artifact_deployed,
+            start_service: default_start_service,
+        }
+    }
+}
+
+unsafe extern "C" fn default_deploy(
+    _artifact: PythonArtifactId,
+    _spec: *const u8,
+    _spec_len: usize,
+) {
+    // TODO return error.
+    panic!("Not ready");
+}
+
+unsafe extern "C" fn default_is_artifact_deployed(_artifact: PythonArtifactId) -> bool {
+    // TODO return error.
+    panic!("Not ready");
+}
+
+unsafe extern "C" fn default_start_service(_spec: PythonInstanceSpec) {
+    // TODO return error.
+    panic!("Not ready");
 }

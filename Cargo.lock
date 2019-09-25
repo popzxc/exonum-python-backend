@@ -1659,6 +1659,7 @@ dependencies = [
  "exonum-merkledb 0.12.0 (git+https://github.com/popzxc/exonum.git?branch=exonum-supervisor)",
  "exonum-supervisor 0.12.0 (git+https://github.com/popzxc/exonum.git?branch=exonum-supervisor)",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

@@ -3,26 +3,30 @@ use exonum::{
     node::ApiSender,
     proto::Any,
     runtime::{
-        dispatcher::{Dispatcher, DispatcherSender, Error as DispatcherError},
+        dispatcher::{Dispatcher, DispatcherSender},
         ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
         InstanceDescriptor, InstanceSpec, Runtime, StateHashAggregator,
     },
 };
 use exonum_derive::IntoExecutionError;
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use futures::{Future, IntoFuture};
 
-use std::collections::btree_map::{BTreeMap, Entry};
+use std::sync::RwLock;
 
-use super::python_interface::PythonRuntimeInterface;
+use super::{
+    python_interface::PythonRuntimeInterface,
+    types::{into_ptr_and_len, PythonArtifactId, PythonInstanceSpec},
+};
+
+lazy_static! {
+    static ref PYTHON_INTERFACE: RwLock<PythonRuntimeInterface> =
+        RwLock::new(PythonRuntimeInterface::default());
+}
 
 /// Sample runtime.
 #[derive(Debug)]
-struct PythonRuntime {
-    python_backend: Option<PythonRuntimeInterface>,
-    deployed_artifacts: BTreeMap<ArtifactId, Any>,
-    // started_services: BTreeMap<InstanceId, SampleService>,
-}
+pub struct PythonRuntime;
 
 // Define runtime specific errors.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
@@ -41,6 +45,14 @@ impl PythonRuntime {
     const ID: u32 = 2;
 }
 
+impl PythonRuntime {
+    pub fn on_artifact_deployed(&mut self, _artifact: PythonArtifactId) {
+        // TODO
+    }
+}
+
+// const ERROR_PYTHON_INTERFACE_NOT_READY: u8 = 0;
+
 impl Runtime for PythonRuntime {
     /// TODO
     fn deploy_artifact(
@@ -48,31 +60,46 @@ impl Runtime for PythonRuntime {
         artifact: ArtifactId,
         spec: Any,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        Box::new(
-            match self.deployed_artifacts.entry(artifact) {
-                Entry::Occupied(_) => Err(DispatcherError::ArtifactAlreadyDeployed),
-                Entry::Vacant(entry) => {
-                    println!("Deploying artifact: {}", entry.key());
-                    entry.insert(spec);
-                    Ok(())
-                }
-            }
-            .map_err(ExecutionError::from)
-            .into_future(),
-        )
+        let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
+
+        let spec_bytes = spec.to_bytes();
+
+        let deploy_artifact_fn = python_interface.deploy_artifact;
+
+        unsafe {
+            let python_artifact_id = PythonArtifactId::from_artifact_id(&artifact);
+            let (spec_bytes_ptr, spec_bytes_len) = into_ptr_and_len(&spec_bytes);
+            deploy_artifact_fn(python_artifact_id, spec_bytes_ptr, spec_bytes_len);
+        }
+
+        // TODO actually use a future
+        let res: Result<(), ExecutionError> = Ok(());
+        Box::new(res.into_future())
     }
 
     /// TODO
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
-        self.deployed_artifacts.contains_key(id)
+        let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
+
+        let is_artifact_deployed_fn = python_interface.is_artifact_deployed;
+        unsafe {
+            let python_artifact_id = PythonArtifactId::from_artifact_id(id);
+            is_artifact_deployed_fn(python_artifact_id)
+        }
     }
 
     /// TODO
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
-        if !self.deployed_artifacts.contains_key(&spec.artifact) {
-            return Err(DispatcherError::ArtifactNotDeployed.into());
+        let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
+
+        let start_service_fn = python_interface.start_service;
+        // TODO return either Ok or Err depending on python return value.
+        unsafe {
+            let python_instance_spec = PythonInstanceSpec::from_instance_spec(spec);
+
+            start_service_fn(python_instance_spec);
+            Ok(())
         }
-        Ok(())
     }
 
     /// TODO
@@ -101,10 +128,11 @@ impl Runtime for PythonRuntime {
     }
 
     /// TODO
-    fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
-        self.deployed_artifacts
-            .get(id)
-            .map(|_| ArtifactProtobufSpec::default())
+    fn artifact_protobuf_spec(&self, _id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
+        // self.deployed_artifacts
+        //     .get(id)
+        //     .map(|_| ArtifactProtobufSpec::default())
+        None
     }
 
     /// TODO

@@ -1,8 +1,14 @@
+#[macro_use]
+extern crate lazy_static;
+
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
+// TODO refine pub-ness
+pub mod pending_deployment;
 pub mod python_interface;
-mod runtime;
+pub mod runtime;
+pub mod types;
 
 type CCallbackType = unsafe extern "C" fn(a: u32, b: u32) -> u32;
 
@@ -19,4 +25,9 @@ fn test2(f: CCallbackType) {
         let aaa = f(1, 2);
         println!("Got {}", aaa);
     }
+}
+
+// TODO return result
+pub fn initialize_python_backend() -> Option<runtime::PythonRuntime> {
+    None
 }
