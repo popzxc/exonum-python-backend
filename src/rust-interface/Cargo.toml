@@ -5,7 +5,13 @@ authors = ["Igor Aleksanov <popzxc@yandex.ru>"]
 edition = "2018"
 
 [lib]
-name = "raytracer_ffi"
+name = "rust_interface"
 crate-type = ["dylib"]
 
 [dependencies]
+futures = "0.1.25"
+
+exonum = { git = "https://github.com/popzxc/exonum.git", branch="exonum-supervisor" }
+exonum-derive = { git = "https://github.com/popzxc/exonum.git", branch="exonum-supervisor" }
+exonum-merkledb = { git = "https://github.com/popzxc/exonum.git", branch="exonum-supervisor" }
+exonum-supervisor = { git = "https://github.com/popzxc/exonum.git", branch="exonum-supervisor" }
