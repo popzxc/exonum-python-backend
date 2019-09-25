@@ -6,7 +6,7 @@ use exonum::runtime::ExecutionError;
 pub type DeploymentStatus = Option<Result<(), ExecutionError>>;
 type RwLockArc<T> = Arc<RwLock<T>>;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct PendingDeployment {
     result: RwLockArc<DeploymentStatus>,
 }

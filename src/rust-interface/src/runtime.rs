@@ -1,3 +1,5 @@
+use futures::{Future, IntoFuture};
+
 use exonum::{
     crypto::{PublicKey, SecretKey},
     node::ApiSender,
@@ -8,50 +10,23 @@ use exonum::{
         InstanceDescriptor, InstanceSpec, Runtime, StateHashAggregator,
     },
 };
-use exonum_derive::IntoExecutionError;
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
-use futures::{Future, IntoFuture};
-
-use std::sync::RwLock;
 
 use super::{
-    python_interface::PythonRuntimeInterface,
+    errors::PythonRuntimeError,
+    pending_deployment::PendingDeployment,
+    python_interface::PYTHON_INTERFACE,
     types::{into_ptr_and_len, PythonArtifactId, PythonInstanceSpec},
 };
-
-lazy_static! {
-    static ref PYTHON_INTERFACE: RwLock<PythonRuntimeInterface> =
-        RwLock::new(PythonRuntimeInterface::default());
-}
 
 /// Sample runtime.
 #[derive(Debug)]
 pub struct PythonRuntime;
 
-// Define runtime specific errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[exonum(kind = "runtime")]
-enum SampleRuntimeError {
-    /// Unable to parse service configuration.
-    ConfigParseError = 0,
-    /// Incorrect information to call transaction.
-    IncorrectCallInfo = 1,
-    /// Incorrect transaction payload.
-    IncorrectPayload = 2,
-}
-
 impl PythonRuntime {
     /// Runtime identifier for the python runtime.
     const ID: u32 = 2;
 }
-
-impl PythonRuntime {
-    pub fn on_artifact_deployed(&mut self, _artifact: PythonArtifactId) {
-        // TODO
-    }
-}
-
-// const ERROR_PYTHON_INTERFACE_NOT_READY: u8 = 0;
 
 impl Runtime for PythonRuntime {
     /// TODO
@@ -60,21 +35,30 @@ impl Runtime for PythonRuntime {
         artifact: ArtifactId,
         spec: Any,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
+        let mut python_interface = PYTHON_INTERFACE.write().expect("Interface read");
 
         let spec_bytes = spec.to_bytes();
 
         let deploy_artifact_fn = python_interface.deploy_artifact;
 
-        unsafe {
+        let result = unsafe {
             let python_artifact_id = PythonArtifactId::from_artifact_id(&artifact);
             let (spec_bytes_ptr, spec_bytes_len) = into_ptr_and_len(&spec_bytes);
-            deploy_artifact_fn(python_artifact_id, spec_bytes_ptr, spec_bytes_len);
-        }
+            deploy_artifact_fn(python_artifact_id, spec_bytes_ptr, spec_bytes_len)
+        };
 
-        // TODO actually use a future
-        let res: Result<(), ExecutionError> = Ok(());
-        Box::new(res.into_future())
+        if result.success {
+            // TODO actually use a future
+            let deployment_future = PendingDeployment::new();
+
+            python_interface.notify_deployment_started(artifact, deployment_future.clone());
+
+            Box::new(deployment_future)
+        } else {
+            let error = PythonRuntimeError::from_value(result.error_code);
+
+            Box::new(Err(error.into()).into_future())
+        }
     }
 
     /// TODO

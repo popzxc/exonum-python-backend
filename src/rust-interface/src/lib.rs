@@ -5,6 +5,7 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 
 // TODO refine pub-ness
+pub mod errors;
 pub mod pending_deployment;
 pub mod python_interface;
 pub mod runtime;

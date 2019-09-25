@@ -1,0 +1,21 @@
+use exonum_derive::IntoExecutionError;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
+#[exonum(kind = "runtime")]
+pub enum PythonRuntimeError {
+    /// PythonRuntime is not ready yet for work.
+    RuntimeNotReady = 0,
+
+    /// Undefined kind of error.
+    /// Receiving that kind of error probably means that something wrong with runtime implementation.
+    Other = 255,
+}
+
+impl PythonRuntimeError {
+    pub fn from_value(value: u32) -> PythonRuntimeError {
+        match value {
+            0 => PythonRuntimeError::RuntimeNotReady,
+            _ => PythonRuntimeError::Other,
+        }
+    }
+}

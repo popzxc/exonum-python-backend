@@ -1,6 +1,13 @@
+use std::ffi::CStr;
 use std::os::raw::c_char;
 
 use exonum::runtime::{ArtifactId, InstanceSpec};
+
+#[repr(C)]
+pub struct PythonResult {
+    pub success: bool,
+    pub error_code: u32,
+}
 
 #[repr(C)]
 pub struct PythonArtifactId {
@@ -15,6 +22,21 @@ impl PythonArtifactId {
         PythonArtifactId {
             runtime_id: artifact.runtime_id,
             name: artifact_name,
+        }
+    }
+}
+
+impl From<PythonArtifactId> for ArtifactId {
+    fn from(python_artifact: PythonArtifactId) -> ArtifactId {
+        let artifact_name = unsafe {
+            CStr::from_ptr(python_artifact.name)
+                .to_string_lossy()
+                .into_owned()
+        };
+
+        ArtifactId {
+            name: artifact_name,
+            runtime_id: python_artifact.runtime_id,
         }
     }
 }
