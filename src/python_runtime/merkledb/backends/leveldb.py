@@ -26,6 +26,9 @@ class LevelDBFork(Fork):
     def get(self, key: bytes) -> Optional[bytes]:
         return self._inner.get(key)
 
+    def merge(self) -> None:
+        self._inner.write()
+
 
 class LevelDB(Database):
     """TODO"""
