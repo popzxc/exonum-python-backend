@@ -1,8 +1,8 @@
 """TODO"""
 from typing import Optional, Any
 
-from python_runtime.merkledb.db import Fork, Database
-from python_runtime.merkledb.index_owner import IndexOwner
+from runtime.merkledb.db import Fork, Database
+from runtime.merkledb.index_owner import IndexOwner
 
 from .base_index import BaseIndex
 

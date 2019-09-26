@@ -4,7 +4,7 @@ from typing import Optional, Dict, Any
 
 import plyvel as lvldb
 
-from python_runtime.merkledb.db import Database, Fork
+from runtime.merkledb.db import Database, Fork
 
 
 class DbOptions:

@@ -2,8 +2,8 @@
 
 from typing import Optional, Any
 
-from python_runtime.merkledb.db import Database, Fork
-from python_runtime.merkledb.index_owner import IndexOwner
+from runtime.merkledb.db import Database, Fork
+from runtime.merkledb.index_owner import IndexOwner
 
 
 class BaseIndex:

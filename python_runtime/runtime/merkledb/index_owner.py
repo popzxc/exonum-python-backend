@@ -1,5 +1,5 @@
 """TODO"""
-from python_runtime.crypto import SecretKey, Signature
+from runtime.crypto import SecretKey, Signature
 
 
 class IndexOwner:
