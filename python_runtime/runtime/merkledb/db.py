@@ -29,9 +29,31 @@ class Fork(metaclass=abc.ABCMeta):
         self.merge()
 
 
+class Snapshot(metaclass=abc.ABCMeta):
+    """TODO"""
+
+    @abc.abstractmethod
+    def get(self, key: bytes) -> Optional[bytes]:
+        """TODO"""
+
+    @abc.abstractmethod
+    def close(self) -> None:
+        """TODO"""
+
+    def __enter__(self) -> "Snapshot":
+        return self
+
+    def __exit__(self, exc_type: Optional[type], exc_value: Optional[Any], exc_traceback: Optional[object]) -> None:
+        self.close()
+
+
 class Database(metaclass=abc.ABCMeta):
     """TODO"""
 
     @abc.abstractmethod
     def fork(self, name: str, family: Optional[str] = None) -> Fork:
+        """TODO"""
+
+    @abc.abstractmethod
+    def snapshot(self, name: str, family: Optional[str] = None) -> Snapshot:
         """TODO"""

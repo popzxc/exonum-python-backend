@@ -4,14 +4,14 @@ from typing import Optional, Dict, Any
 
 import plyvel as lvldb
 
-from runtime.merkledb.db import Database, Fork
+from runtime.merkledb.db import Database, Fork, Snapshot
 
 
 class DbOptions:
     """TODO"""
 
 
-class LevelDBFork(Fork):
+class _LevelDBFork(Fork):
     """TODO"""
 
     def __init__(self, inner: Any):
@@ -28,6 +28,19 @@ class LevelDBFork(Fork):
 
     def merge(self) -> None:
         self._inner.write()
+
+
+class _LevelDBSnapshot(Snapshot):
+    """TODO"""
+
+    def __init__(self, inner: Any):
+        self._inner = inner
+
+    def get(self, key: bytes) -> Optional[bytes]:
+        return self._inner.get(key)
+
+    def close(self) -> None:
+        self._inner.close()
 
 
 class LevelDB(Database):
@@ -56,4 +69,18 @@ class LevelDB(Database):
         else:
             fork = database.write_batch(transaction=True)
 
-        return LevelDBFork(fork)
+        return _LevelDBFork(fork)
+
+    def snapshot(self, name: str, family: Optional[str] = None) -> Snapshot:
+        """TODO"""
+        options = self._get_options()
+
+        options["name"] = name
+        database = lvldb.DB(**options)
+
+        if family:
+            snapshot = database.prefixed_db(bytes(family, "utf-8")).snapshot()
+        else:
+            snapshot = database.snapshot()
+
+        return _LevelDBSnapshot(snapshot)
