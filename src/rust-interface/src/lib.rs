@@ -4,13 +4,20 @@ extern crate lazy_static;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
-// TODO refine pub-ness
-pub mod errors;
-pub mod pending_deployment;
-pub mod python_interface;
-pub mod runtime;
-pub mod types;
+use exonum::runtime::Runtime;
 
+mod errors;
+mod pending_deployment;
+mod python_interface;
+mod runtime;
+mod types;
+
+// TODO return result
+pub fn initialize_python_backend() -> Option<Box<dyn Runtime>> {
+    None
+}
+
+// To be removed
 type CCallbackType = unsafe extern "C" fn(a: u32, b: u32) -> u32;
 
 #[no_mangle]
@@ -26,9 +33,4 @@ fn test2(f: CCallbackType) {
         let aaa = f(1, 2);
         println!("Got {}", aaa);
     }
-}
-
-// TODO return result
-pub fn initialize_python_backend() -> Option<runtime::PythonRuntime> {
-    None
 }

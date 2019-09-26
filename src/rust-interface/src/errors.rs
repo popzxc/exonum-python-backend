@@ -1,5 +1,6 @@
 use exonum_derive::IntoExecutionError;
 
+/// Enum representing common python runtime errors.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
 #[exonum(kind = "runtime")]
 pub enum PythonRuntimeError {
