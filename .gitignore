@@ -1,5 +1,8 @@
 ## Python section (Rust section below).
 
+# Protobuf generated files.
+*_pb2.py
+
 # VS code workspace
 *.code-workspace
 

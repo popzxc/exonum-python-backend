@@ -6,7 +6,7 @@ use exonum::runtime::ArtifactId;
 use super::{
     errors::PythonRuntimeError,
     pending_deployment::PendingDeployment,
-    types::{PythonArtifactId, PythonInstanceSpec, PythonResult},
+    types::{RawArtifactId, RawInstanceSpec, RawResult},
 };
 
 lazy_static! {
@@ -32,13 +32,10 @@ impl PythonRuntimeInterface {
 }
 
 // Types of the stored functions.
-type PythonDeployArtifactMethod = unsafe extern "C" fn(
-    artifact: PythonArtifactId,
-    spec: *const u8,
-    spec_len: usize,
-) -> PythonResult;
-type PythonIsArtifactDeployedMethod = unsafe extern "C" fn(artifact: PythonArtifactId) -> bool;
-type PythonStartServiceMethod = unsafe extern "C" fn(spec: PythonInstanceSpec) -> PythonResult;
+type PythonDeployArtifactMethod =
+    unsafe extern "C" fn(artifact: RawArtifactId, spec: *const u8, spec_len: u64) -> RawResult;
+type PythonIsArtifactDeployedMethod = unsafe extern "C" fn(artifact: RawArtifactId) -> bool;
+type PythonStartServiceMethod = unsafe extern "C" fn(spec: RawInstanceSpec) -> RawResult;
 
 /// Structure with the Python side API.
 #[repr(C)]
@@ -71,7 +68,7 @@ fn init_python_side(methods: PythonMethods) {
 /// Removes an artifact from the pending deployments.
 /// This function is meant to be called by the python after the deployment of the artifact.
 #[no_mangle]
-fn deployment_completed(python_artifact: PythonArtifactId, result: PythonResult) {
+fn deployment_completed(python_artifact: RawArtifactId, result: RawResult) {
     let artifact = ArtifactId::from(python_artifact);
     let mut python_interface = PYTHON_INTERFACE.write().expect("Excepted write");
 
@@ -95,22 +92,22 @@ fn deployment_completed(python_artifact: PythonArtifactId, result: PythonResult)
 }
 
 unsafe extern "C" fn default_deploy(
-    _artifact: PythonArtifactId,
+    _artifact: RawArtifactId,
     _spec: *const u8,
-    _spec_len: usize,
-) -> PythonResult {
-    PythonResult {
+    _spec_len: u64,
+) -> RawResult {
+    RawResult {
         success: false,
         error_code: PythonRuntimeError::RuntimeNotReady as u32,
     }
 }
 
-unsafe extern "C" fn default_is_artifact_deployed(_artifact: PythonArtifactId) -> bool {
+unsafe extern "C" fn default_is_artifact_deployed(_artifact: RawArtifactId) -> bool {
     false
 }
 
-unsafe extern "C" fn default_start_service(_spec: PythonInstanceSpec) -> PythonResult {
-    PythonResult {
+unsafe extern "C" fn default_start_service(_spec: RawInstanceSpec) -> RawResult {
+    RawResult {
         success: false,
         error_code: PythonRuntimeError::RuntimeNotReady as u32,
     }

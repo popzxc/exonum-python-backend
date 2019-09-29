@@ -1,0 +1,6 @@
+[python]
+rust_library_path = "~/hobby/exonum-python-backend/target/debug/librust_interface.so"
+database = "leveldb"
+
+[database]
+# TODO

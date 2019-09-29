@@ -16,7 +16,7 @@ use super::{
     errors::PythonRuntimeError,
     pending_deployment::PendingDeployment,
     python_interface::PYTHON_INTERFACE,
-    types::{into_ptr_and_len, PythonArtifactId, PythonInstanceSpec},
+    types::{into_ptr_and_len, RawArtifactId, RawInstanceSpec},
 };
 
 /// Sample runtime.
@@ -41,9 +41,13 @@ impl Runtime for PythonRuntime {
 
         // Call the python side of `deploy_artifact`.
         let result = unsafe {
-            let python_artifact_id = PythonArtifactId::from_artifact_id(&artifact);
+            let python_artifact_id = RawArtifactId::from_artifact_id(&artifact);
             let (spec_bytes_ptr, spec_bytes_len) = into_ptr_and_len(&spec_bytes);
-            (python_interface.methods.deploy_artifact)(python_artifact_id, spec_bytes_ptr, spec_bytes_len)
+            (python_interface.methods.deploy_artifact)(
+                python_artifact_id,
+                spec_bytes_ptr,
+                spec_bytes_len as u64,
+            )
         };
 
         // Look at the result.
@@ -67,7 +71,7 @@ impl Runtime for PythonRuntime {
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
         unsafe {
-            let python_artifact_id = PythonArtifactId::from_artifact_id(id);
+            let python_artifact_id = RawArtifactId::from_artifact_id(id);
             (python_interface.methods.is_artifact_deployed)(python_artifact_id)
         }
     }
@@ -77,7 +81,7 @@ impl Runtime for PythonRuntime {
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
         let result = unsafe {
-            let python_instance_spec = PythonInstanceSpec::from_instance_spec(spec);
+            let python_instance_spec = RawInstanceSpec::from_instance_spec(spec);
 
             (python_interface.methods.start_service)(python_instance_spec)
         };

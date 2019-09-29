@@ -1,37 +1,45 @@
 """TODO"""
-import ctypes as c
+import asyncio
+import sys
+import os
 
-RUST_LIBRARY_PATH = "../../target/debug/librust_interface.so"
-
-
-class RustFFIProvider:
-    """TODO"""
-
-    def __init__(self, rust_library_path):
-        self._rust_library_path = rust_library_path
-
-        c.cdll.LoadLibrary(RUST_LIBRARY_PATH)
-        self._rust_interface = c.CDLL(RUST_LIBRARY_PATH)
+from .runtime import PythonRuntime
 
 
-@c.CFUNCTYPE(c.c_uint32, c.c_uint32, c.c_uint32)
-def callback(first, second):
-    """TODO"""
-    print("Hello from python!")
-    return first + second
+def main() -> None:
+    """Starts the Exonum Python Runtime."""
+    config_path = parse_args()
+
+    loop = asyncio.new_event_loop()
+
+    _runtime = PythonRuntime(loop, config_path)
+
+    loop.run_forever()
 
 
-def main():
-    """TODO"""
+def parse_args() -> str:
+    """Parses config file path from command line arguments."""
+    if len(sys.argv) != 2 or sys.argv[1] in ["-h", "--help", "help"]:
+        print_help()
+        sys.exit(0)
 
-    # rust_interface = ffi.dlopen(RUST_LIBRARY_PATH)
-    c.cdll.LoadLibrary(RUST_LIBRARY_PATH)
-    rust_interface = c.CDLL(RUST_LIBRARY_PATH)
+    config_path = sys.argv[1]
+    if not os.path.isfile(config_path):
+        print("Specified path is not a valid file path")
+        sys.exit(1)
 
-    hi_str = c.c_char_p(b"hello from python")
-    print(rust_interface.test(1, hi_str))
+    return config_path
 
-    rust_interface.test2(callback)
+
+def print_help() -> None:
+    """Prints help message."""
+    usage = """
+    Exonum Python runtime.
+
+    Usage: python3.7 -m exonum_python_runtime path/to/config.toml
+    """
+
+    print(usage)
 
 
 if __name__ == "__main__":

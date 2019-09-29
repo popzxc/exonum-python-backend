@@ -4,30 +4,30 @@ use std::os::raw::c_char;
 use exonum::runtime::{ArtifactId, InstanceSpec};
 
 #[repr(C)]
-pub struct PythonResult {
+pub struct RawResult {
     pub success: bool,
     pub error_code: u32,
 }
 
 #[repr(C)]
-pub struct PythonArtifactId {
+pub struct RawArtifactId {
     pub runtime_id: u32,
     pub name: *const c_char,
 }
 
-impl PythonArtifactId {
-    pub unsafe fn from_artifact_id(artifact: &ArtifactId) -> PythonArtifactId {
+impl RawArtifactId {
+    pub unsafe fn from_artifact_id(artifact: &ArtifactId) -> RawArtifactId {
         // This function isn't unsafe in the terms of language, but logically it is.
         let artifact_name = artifact.name.as_ptr() as *const c_char;
-        PythonArtifactId {
+        RawArtifactId {
             runtime_id: artifact.runtime_id,
             name: artifact_name,
         }
     }
 }
 
-impl From<PythonArtifactId> for ArtifactId {
-    fn from(python_artifact: PythonArtifactId) -> ArtifactId {
+impl From<RawArtifactId> for ArtifactId {
+    fn from(python_artifact: RawArtifactId) -> ArtifactId {
         let artifact_name = unsafe {
             CStr::from_ptr(python_artifact.name)
                 .to_string_lossy()
@@ -49,18 +49,18 @@ pub unsafe fn into_ptr_and_len(data: &[u8]) -> (*const u8, usize) {
 }
 
 #[repr(C)]
-pub struct PythonInstanceSpec {
+pub struct RawInstanceSpec {
     pub name: *const c_char,
-    pub artifact: PythonArtifactId,
+    pub artifact: RawArtifactId,
 }
 
-impl PythonInstanceSpec {
-    pub unsafe fn from_instance_spec(instance_spec: &InstanceSpec) -> PythonInstanceSpec {
+impl RawInstanceSpec {
+    pub unsafe fn from_instance_spec(instance_spec: &InstanceSpec) -> RawInstanceSpec {
         let name = instance_spec.name.as_ptr() as *const c_char;
 
-        PythonInstanceSpec {
+        RawInstanceSpec {
             name,
-            artifact: PythonArtifactId::from_artifact_id(&instance_spec.artifact),
+            artifact: RawArtifactId::from_artifact_id(&instance_spec.artifact),
         }
     }
 }

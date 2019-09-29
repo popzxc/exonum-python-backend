@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package exonum.python.runtime;
+
+// Python artifact spec.
+message PythonArtifactSpec {
+    // Expected hash of the artifact.
+    bytes hash = 1;
+}
