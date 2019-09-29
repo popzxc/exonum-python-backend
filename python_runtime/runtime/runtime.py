@@ -6,77 +6,12 @@ import os
 import sys
 import importlib
 
+from .artifact import Artifact
 from .types import RuntimeInterface, ArtifactId, InstanceSpec, DeploymentResult, PythonRuntimeError
 from .config import Configuration
 from .ffi import RustFFIProvider
 from .proto.protobuf import PythonArtifactSpec, ParseError
 from .service import Service
-
-
-class Artifact:
-    """TODO"""
-
-    def __init__(self, artifact_id: ArtifactId, spec: PythonArtifactSpec, config: Configuration):
-        self._id = artifact_id
-        self._spec = spec
-        self._config = config
-        self._service_class: Optional[Type[Service]] = None
-
-    async def deploy(self, future: asyncio.Future) -> None:
-        """Performs the deploy process."""
-
-        in_dir = self._config.artifacts_sources_folder
-        out_dir = self._config.built_sources_folder
-
-        tarball_path = os.path.join(in_dir, self._spec.source_wheel_name)
-
-        # Install module using pip.
-        install_command = " ".join([sys.executable, "-m", "pip", "install", tarball_path, "--target", out_dir])
-
-        proc = await asyncio.create_subprocess_shell(
-            install_command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-
-        _, _ = await proc.communicate()
-
-        # On successfull installation pip should return 0.
-        if proc.returncode != 0:
-            result = DeploymentResult(
-                success=False, error=PythonRuntimeError.SERVICE_INSTALL_FAILED, artifact_id=self._id
-            )
-
-            future.set_result(result)
-            return
-
-        # Try to import service library.
-        try:
-            service_module = importlib.import_module(self._spec.service_library_name)
-        except (ModuleNotFoundError, ImportError):
-            result = DeploymentResult(
-                success=False, error=PythonRuntimeError.SERVICE_INSTALL_FAILED, artifact_id=self._id
-            )
-
-            future.set_result(result)
-            return
-
-        # Try to get service class.
-        try:
-            service = getattr(service_module, self._spec.service_class_name)
-
-            if not issubclass(service, Service):
-                raise ValueError("Not a Service subclass")
-
-        except (ValueError, AttributeError):
-            result = DeploymentResult(
-                success=False, error=PythonRuntimeError.SERVICE_INSTALL_FAILED, artifact_id=self._id
-            )
-
-            future.set_result(result)
-            return
-
-        self._service_class = service
-        result = DeploymentResult(success=True, error=None, artifact_id=self._id)
-        future.set_result(result)
 
 
 class Instance:
