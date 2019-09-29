@@ -1,8 +1,18 @@
 """TODO"""
-from typing import Any
+from typing import Any, Optional
 import ctypes as c
 
-from .types import ArtifactId, RuntimeInterface, DeploymentResult, InstanceSpec
+from .crypto import KeyPair
+from .types import (
+    ArtifactId,
+    RuntimeInterface,
+    DeploymentResult,
+    InstanceSpec,
+    InstanceDescriptor,
+    CallInfo,
+    StateHashAggregator,
+    PythonRuntimeError,
+)
 
 
 class RawResult(c.Structure):
@@ -118,15 +128,6 @@ class RustFFIProvider(RuntimeInterface):
     def _init_rust(self) -> None:
         """Initializes Python interfaces in the Rust side."""
 
-    def request_deploy(self, artifact_id: ArtifactId, artifact_spec: bytes) -> None:
-        self._runtime.request_deploy(artifact_id, artifact_spec)
-
-    def is_artifact_deployed(self, artifact_id: ArtifactId) -> bool:
-        return self._runtime.is_artifact_deployed(artifact_id)
-
-    def start_instance(self, instance_spec: InstanceSpec) -> None:
-        self._runtime.start_instance(instance_spec)
-
     def deploy_completed(self, result: DeploymentResult) -> None:
         """Method to be called when deployment is completed."""
         raw_artifact = RawArtifactId.from_artifact_id(result.artifact_id)
@@ -137,3 +138,33 @@ class RustFFIProvider(RuntimeInterface):
             raw_result = RawResult(success=False, error_code=result.error.value)
 
         self._rust_interface.deployment_completed(raw_artifact, raw_result)
+
+    # Implementation of RuntimeInterface
+    # TODO do we really need this as a Runtime proxy?.. Maybe just access it through a property?
+
+    def request_deploy(self, artifact_id: ArtifactId, artifact_spec: bytes) -> Optional[PythonRuntimeError]:
+        return self._runtime.request_deploy(artifact_id, artifact_spec)
+
+    def is_artifact_deployed(self, artifact_id: ArtifactId) -> bool:
+        return self._runtime.is_artifact_deployed(artifact_id)
+
+    def start_instance(self, instance_spec: InstanceSpec) -> Optional[PythonRuntimeError]:
+        return self._runtime.start_instance(instance_spec)
+
+    def initialize_service(self, instance: InstanceDescriptor, parameters: bytes) -> Optional[PythonRuntimeError]:
+        return self._runtime.initialize_service(instance, parameters)
+
+    def stop_service(self, instance: InstanceDescriptor) -> Optional[PythonRuntimeError]:
+        return self._runtime.stop_service(instance)
+
+    def execute(self, call_info: CallInfo, arguments: bytes) -> Optional[PythonRuntimeError]:
+        return self._runtime.execute(call_info, arguments)
+
+    def state_hashes(self) -> StateHashAggregator:
+        return self._runtime.state_hashes()
+
+    def before_commit(self) -> None:
+        self._runtime.before_commit()
+
+    def after_commit(self, service_keypair: KeyPair) -> None:
+        self._runtime.after_commit(service_keypair)

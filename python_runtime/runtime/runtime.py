@@ -1,17 +1,25 @@
 """TODO"""
 
 import asyncio
-from typing import Dict, Optional, Type
+from typing import Dict, Optional
 import os
 import sys
-import importlib
 
 from .artifact import Artifact
-from .types import RuntimeInterface, ArtifactId, InstanceSpec, DeploymentResult, PythonRuntimeError
+from .types import (
+    RuntimeInterface,
+    ArtifactId,
+    InstanceSpec,
+    DeploymentResult,
+    PythonRuntimeError,
+    InstanceDescriptor,
+    CallInfo,
+    StateHashAggregator,
+)
 from .config import Configuration
+from .crypto import KeyPair
 from .ffi import RustFFIProvider
 from .proto.protobuf import PythonArtifactSpec, ParseError
-from .service import Service
 
 
 class Instance:
@@ -51,6 +59,18 @@ class PythonRuntime(RuntimeInterface):
 
         # TODO load artifacts & instances (don't forget to verify hashes)
 
+    def _deploy_completed(self, future: asyncio.Future) -> None:
+        result: DeploymentResult = future.result()
+
+        self._rust_ffi.deploy_completed(result)
+        if result.success:
+            artifact_id = result.artifact_id
+            artifact = self._pending_deployments[result.artifact_id]
+            self._artifacts[artifact_id] = artifact
+            del self._pending_deployments[result.artifact_id]
+
+    # Implementation of RuntimeInterface.
+
     def request_deploy(self, artifact_id: ArtifactId, artifact_spec: bytes) -> Optional[PythonRuntimeError]:
         try:
             spec = PythonArtifactSpec.from_bytes(artifact_spec)
@@ -71,15 +91,23 @@ class PythonRuntime(RuntimeInterface):
     def is_artifact_deployed(self, artifact_id: ArtifactId) -> bool:
         return artifact_id in self._artifacts
 
-    def start_instance(self, instance_spec: InstanceSpec) -> None:
-        pass
+    def start_instance(self, instance_spec: InstanceSpec) -> Optional[PythonRuntimeError]:
+        raise NotImplementedError
 
-    def _deploy_completed(self, future: asyncio.Future) -> None:
-        result: DeploymentResult = future.result()
+    def initialize_service(self, instance: InstanceDescriptor, parameters: bytes) -> Optional[PythonRuntimeError]:
+        raise NotImplementedError
 
-        self._rust_ffi.deploy_completed(result)
-        if result.success:
-            artifact_id = result.artifact_id
-            artifact = self._pending_deployments[result.artifact_id]
-            self._artifacts[artifact_id] = artifact
-            del self._pending_deployments[result.artifact_id]
+    def stop_service(self, instance: InstanceDescriptor) -> Optional[PythonRuntimeError]:
+        raise NotImplementedError
+
+    def execute(self, call_info: CallInfo, arguments: bytes) -> Optional[PythonRuntimeError]:
+        raise NotImplementedError
+
+    def state_hashes(self) -> StateHashAggregator:
+        raise NotImplementedError
+
+    def before_commit(self) -> None:
+        raise NotImplementedError
+
+    def after_commit(self, service_keypair: KeyPair) -> None:
+        raise NotImplementedError
