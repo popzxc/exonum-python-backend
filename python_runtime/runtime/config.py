@@ -14,4 +14,6 @@ class Configuration:
         toml_config = toml.load(self._config_path)
 
         self.rust_lib_path = toml_config["python"]["rust_library_path"]
+        self.artifacts_sources_folder = toml_config["python"]["artifacts_sources_folder"]
+        self.built_sources_folder = toml_config["python"]["built_sources_folder"]
         self.db_options = toml_config["database"]

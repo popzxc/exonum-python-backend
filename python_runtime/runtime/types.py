@@ -10,6 +10,7 @@ class PythonRuntimeError(IntEnum):
     # TODO
     RUNTIME_NOT_READY = 0
     WRONG_SPEC = 1
+    SERVICE_INSTALL_FAILED = 2
 
 
 class ArtifactId(NamedTuple):
