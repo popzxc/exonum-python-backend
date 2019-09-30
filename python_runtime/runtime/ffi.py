@@ -58,7 +58,8 @@ class RawInstanceSpec(c.Structure):
         return cls(name=instance_spec.name, artifact=raw_artifact)
 
 
-@c.CFUNCTYPE(RawResult, RawArtifactId, c.POINTER(c.c_ubyte), c.c_uint64)
+# @c.CFUNCTYPE(RawResult, RawArtifactId, c.POINTER(c.c_ubyte), c.c_uint64)
+@c.CFUNCTYPE(c.c_bool, RawArtifactId, c.POINTER(c.c_ubyte), c.c_uint64)
 def deploy_artifact(raw_artifact, raw_data, raw_data_len):  # type: ignore # Signature is one line above.
     """Function called from Rust to indicate an artifact deploy request."""
     artifact_id = raw_artifact.into_artifact_id()
@@ -70,9 +71,11 @@ def deploy_artifact(raw_artifact, raw_data, raw_data_len):  # type: ignore # Sig
     result = ffi.request_deploy(artifact_id, artifact_spec)
 
     if result is not None:
-        return RawResult(success=False, error_code=result.error.value)
+        # return RawResult(success=False, error_code=result.error.value)
+        return False
 
-    return RawResult(success=True, error_code=0)
+    # return RawResult(success=True, error_code=0)
+    return True
 
 
 @c.CFUNCTYPE(c.c_bool, RawArtifactId)
@@ -84,7 +87,8 @@ def is_artifact_deployed(raw_artifact):  # type: ignore # Signature is one line 
     return ffi.is_artifact_deployed(artifact_id)
 
 
-@c.CFUNCTYPE(RawResult, RawInstanceSpec)
+# @c.CFUNCTYPE(RawResult, RawInstanceSpec)
+@c.CFUNCTYPE(c.c_bool, RawInstanceSpec)
 def start_service(raw_spec):  # type: ignore # Signature is one line above.
     """Function called from Rust to indicate an service start request."""
     instance_spec = raw_spec.into_instance_spec()
@@ -94,9 +98,11 @@ def start_service(raw_spec):  # type: ignore # Signature is one line above.
     result = ffi.start_service(instance_spec)
 
     if result is not None:
-        return RawResult(success=False, error_code=result.error.value)
+        # return RawResult(success=False, error_code=result.error.value)
+        return False
 
-    return RawResult(success=True, error_code=0)
+    # return RawResult(success=True, error_code=0)
+    return True
 
 
 class RustFFIProvider(RuntimeInterface):

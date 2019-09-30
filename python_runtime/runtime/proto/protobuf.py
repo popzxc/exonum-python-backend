@@ -7,7 +7,7 @@ except (ModuleNotFoundError, ImportError):
 
 from typing import NamedTuple
 
-from python_runtime.runtime.crypto import Hash
+from runtime.crypto import Hash
 
 
 def _attempt_parse(obj: ProtobufMessage, data: bytes) -> None:
