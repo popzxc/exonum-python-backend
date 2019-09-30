@@ -1,5 +1,7 @@
 ## Python section (Rust section below).
 
+config.toml
+
 # Protobuf generated files.
 *_pb2.py
 
