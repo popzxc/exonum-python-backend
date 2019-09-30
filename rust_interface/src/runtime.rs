@@ -18,7 +18,7 @@ use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use super::{
     errors::PythonRuntimeError,
     pending_deployment::PendingDeployment,
-    python_interface::PYTHON_INTERFACE,
+    python_interface::{PythonRuntimeInterface, PYTHON_INTERFACE},
     types::{into_ptr_and_len, RawArtifactId, RawInstanceSpec},
 };
 
@@ -50,7 +50,7 @@ impl PythonRuntime {
 
         let process = system
             .get_process(self.process_pid)
-            .ok_or(ExecutionError::from(PythonRuntimeError::RuntimeDead))?;
+            .ok_or_else(|| ExecutionError::from(PythonRuntimeError::RuntimeDead))?;
 
         match process.status() {
             ProcessStatus::Run => Ok(()),
@@ -87,24 +87,25 @@ impl Runtime for PythonRuntime {
         };
 
         // Look at the result.
-        if result.success {
-            // Everything is ok, deployment started, create a future and return it.
-            let deployment_future = PendingDeployment::new();
+        match PythonRuntimeInterface::error_code_to_result(result) {
+            Ok(()) => {
+                // Everything is ok, deployment started, create a future and return it.
+                let deployment_future = PendingDeployment::new();
 
-            python_interface.notify_deployment_started(artifact, deployment_future.clone());
+                python_interface.notify_deployment_started(artifact, deployment_future.clone());
 
-            Box::new(deployment_future)
-        } else {
-            // Something went wrong on the initial stage, did not even stert.
-            let error = PythonRuntimeError::from_value(result.error_code);
-
-            Box::new(Err(error.into()).into_future())
+                Box::new(deployment_future)
+            }
+            Err(error) => {
+                // Something went wrong on the initial stage, did not even stert.
+                Box::new(Err(error.into()).into_future())
+            }
         }
     }
 
     /// TODO
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
-        if !self.ensure_runtime().is_ok() {
+        if self.ensure_runtime().is_err() {
             return false;
         }
 
@@ -128,11 +129,7 @@ impl Runtime for PythonRuntime {
             (python_interface.methods.start_service)(python_instance_spec)
         };
 
-        if result.success {
-            Ok(())
-        } else {
-            Err(PythonRuntimeError::from_value(result.error_code).into())
-        }
+        PythonRuntimeInterface::error_code_to_result(result).map_err(From::from)
     }
 
     /// TODO
@@ -178,7 +175,7 @@ impl Runtime for PythonRuntime {
 
     /// TODO
     fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
-        if !self.ensure_runtime().is_ok() {
+        if self.ensure_runtime().is_err() {
             return StateHashAggregator::default();
         }
 
@@ -187,7 +184,7 @@ impl Runtime for PythonRuntime {
 
     /// TODO
     fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {
-        if !self.ensure_runtime().is_ok() {
+        if self.ensure_runtime().is_err() {
             return;
         }
     }
@@ -200,7 +197,7 @@ impl Runtime for PythonRuntime {
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,
     ) {
-        if !self.ensure_runtime().is_ok() {
+        if self.ensure_runtime().is_err() {
             return;
         }
     }

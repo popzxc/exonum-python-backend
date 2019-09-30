@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::os::raw::c_void;
 use std::sync::RwLock;
 
 use exonum::runtime::ArtifactId;
@@ -6,7 +7,7 @@ use exonum::runtime::ArtifactId;
 use super::{
     errors::PythonRuntimeError,
     pending_deployment::PendingDeployment,
-    types::{RawArtifactId, RawInstanceSpec, RawResult},
+    types::{RawArtifactId, RawCallInfo, RawInstanceDescriptor, RawInstanceSpec},
 };
 
 lazy_static! {
@@ -29,13 +30,35 @@ impl PythonRuntimeInterface {
     ) {
         self.ongoing_deployments.insert(artifact, deployment);
     }
+
+    pub fn error_code_to_result(code: u32) -> Result<(), PythonRuntimeError> {
+        let error = match code {
+            0 => return Ok(()),
+            _ => PythonRuntimeError::from_value(code),
+        };
+
+        Err(error)
+    }
 }
 
 // Types of the stored functions.
 type PythonDeployArtifactMethod =
-    unsafe extern "C" fn(artifact: RawArtifactId, spec: *const u8, spec_len: u64) -> RawResult;
+    unsafe extern "C" fn(artifact: RawArtifactId, spec: *const u8, spec_len: u64) -> u32;
 type PythonIsArtifactDeployedMethod = unsafe extern "C" fn(artifact: RawArtifactId) -> bool;
-type PythonStartServiceMethod = unsafe extern "C" fn(spec: RawInstanceSpec) -> RawResult;
+type PythonStartServiceMethod = unsafe extern "C" fn(spec: RawInstanceSpec) -> u32;
+type PythonConfigureServiceMethod = unsafe extern "C" fn(
+    descriptor: RawInstanceDescriptor,
+    parameters: *const u8,
+    parameters_len: u64,
+) -> u32;
+type PythonStopServiceMethod = unsafe extern "C" fn(descriptor: RawInstanceDescriptor) -> u32;
+type PythonExecuteMethod =
+    unsafe extern "C" fn(call_info: RawCallInfo, payload: *const u8, payload_len: u8) -> u32;
+type PythonArtifactProtobufSpecMethod = unsafe extern "C" fn();
+type PythonStateHashesMethod = unsafe extern "C" fn();
+type PythonBeforeCommitMethod = unsafe extern "C" fn();
+type PythonAfterCommitMethod = unsafe extern "C" fn();
+type PythonFreeResourceMethod = unsafe extern "C" fn(resource: *const c_void);
 
 /// Structure with the Python side API.
 #[repr(C)]
@@ -44,6 +67,14 @@ pub struct PythonMethods {
     pub deploy_artifact: PythonDeployArtifactMethod,
     pub is_artifact_deployed: PythonIsArtifactDeployedMethod,
     pub start_service: PythonStartServiceMethod,
+    pub configure_service: PythonConfigureServiceMethod,
+    pub stop_service: PythonStopServiceMethod,
+    pub execute: PythonExecuteMethod,
+    pub artifact_protobuf_spec: PythonArtifactProtobufSpecMethod,
+    pub state_hashes: PythonStateHashesMethod,
+    pub before_commit: PythonBeforeCommitMethod,
+    pub after_commit: PythonAfterCommitMethod,
+    pub free_resource: PythonFreeResourceMethod,
 }
 
 impl Default for PythonMethods {
@@ -52,6 +83,14 @@ impl Default for PythonMethods {
             deploy_artifact: default_deploy,
             is_artifact_deployed: default_is_artifact_deployed,
             start_service: default_start_service,
+            configure_service: default_configure_service_method,
+            stop_service: default_stop_service_method,
+            execute: default_execute_method,
+            artifact_protobuf_spec: default_artifact_protobuf_spec_method,
+            state_hashes: default_state_hashes_method,
+            before_commit: default_before_commit_method,
+            after_commit: default_after_ommit_method,
+            free_resource: default_free_resource_method,
         }
     }
 }
@@ -68,20 +107,21 @@ fn init_python_side(methods: PythonMethods) {
 /// Removes an artifact from the pending deployments.
 /// This function is meant to be called by the python after the deployment of the artifact.
 #[no_mangle]
-fn deployment_completed(python_artifact: RawArtifactId, result: RawResult) {
+fn deployment_completed(python_artifact: RawArtifactId, result: u32) {
     let artifact = ArtifactId::from(python_artifact);
     let mut python_interface = PYTHON_INTERFACE.write().expect("Excepted write");
 
     let future = python_interface.ongoing_deployments.remove(&artifact);
 
     match future {
-        Some(mut f) => {
-            if result.success {
-                f.comlpete();
-            } else {
-                f.error(PythonRuntimeError::from_value(result.error_code).into());
+        Some(mut f) => match PythonRuntimeInterface::error_code_to_result(result) {
+            Ok(()) => {
+                f.complete();
             }
-        }
+            Err(error) => {
+                f.error(error.into());
+            }
+        },
         None => {
             panic!(
                 "Python deployed an artifact that wasn't expected: {:?}",
@@ -95,20 +135,39 @@ unsafe extern "C" fn default_deploy(
     _artifact: RawArtifactId,
     _spec: *const u8,
     _spec_len: u64,
-) -> RawResult {
-    RawResult {
-        success: false,
-        error_code: PythonRuntimeError::RuntimeNotReady as u32,
-    }
+) -> u32 {
+    PythonRuntimeError::RuntimeNotReady as u32
 }
 
 unsafe extern "C" fn default_is_artifact_deployed(_artifact: RawArtifactId) -> bool {
     false
 }
 
-unsafe extern "C" fn default_start_service(_spec: RawInstanceSpec) -> RawResult {
-    RawResult {
-        success: false,
-        error_code: PythonRuntimeError::RuntimeNotReady as u32,
-    }
+unsafe extern "C" fn default_start_service(_spec: RawInstanceSpec) -> u32 {
+    PythonRuntimeError::RuntimeNotReady as u32
 }
+
+unsafe extern "C" fn default_configure_service_method(
+    _descriptor: RawInstanceDescriptor,
+    _parameters: *const u8,
+    _parameters_len: u64,
+) -> u32 {
+    PythonRuntimeError::RuntimeNotReady as u32
+}
+
+unsafe extern "C" fn default_stop_service_method(_descriptor: RawInstanceDescriptor) -> u32 {
+    PythonRuntimeError::RuntimeNotReady as u32
+}
+
+unsafe extern "C" fn default_execute_method(
+    _call_info: RawCallInfo,
+    _payload: *const u8,
+    _payload_len: u8,
+) -> u32 {
+    PythonRuntimeError::RuntimeNotReady as u32
+}
+unsafe extern "C" fn default_artifact_protobuf_spec_method() {}
+unsafe extern "C" fn default_state_hashes_method() {}
+unsafe extern "C" fn default_before_commit_method() {}
+unsafe extern "C" fn default_after_ommit_method() {}
+unsafe extern "C" fn default_free_resource_method(_resource: *const c_void) {}

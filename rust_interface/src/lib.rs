@@ -17,9 +17,10 @@ use runtime::PythonRuntime;
 pub fn initialize_python_backend(python_config_path: &str) -> Option<Box<dyn Runtime>> {
     let python_run_command = Command::new("python")
         .arg("-m runtime")
-        .arg(python_config_path);
+        .arg(python_config_path)
+        .spawn();
 
-    let python_process = match python_run_command.spawn() {
+    let python_process = match python_run_command {
         Ok(handle) => handle,
         Err(_) => return None,
     };

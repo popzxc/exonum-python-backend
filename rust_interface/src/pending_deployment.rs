@@ -18,7 +18,7 @@ impl PendingDeployment {
         }
     }
 
-    pub fn comlpete(&mut self) {
+    pub fn complete(&mut self) {
         *self.result.write().expect("Expected write lock") = Some(Ok(()));
     }
 
