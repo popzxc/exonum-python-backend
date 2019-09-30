@@ -1,4 +1,7 @@
+use std::process::Child;
+
 use futures::{Future, IntoFuture};
+use sysinfo::{Pid, ProcessExt, ProcessStatus, RefreshKind, System, SystemExt};
 
 use exonum::{
     crypto::{PublicKey, SecretKey},
@@ -21,11 +24,39 @@ use super::{
 
 /// Sample runtime.
 #[derive(Debug)]
-pub struct PythonRuntime;
+pub struct PythonRuntime {
+    python_process: Child,
+    process_pid: Pid,
+}
 
 impl PythonRuntime {
     /// Runtime identifier for the python runtime.
     const ID: u32 = 2;
+
+    pub fn new(python_process: Child) -> Self {
+        let process_pid: Pid = python_process.id() as Pid;
+
+        Self {
+            python_process,
+            process_pid,
+        }
+    }
+
+    /// Checks that process is still running.
+    fn ensure_runtime(&self) -> Result<(), ExecutionError> {
+        let mut system = System::new_with_specifics(RefreshKind::new());;
+
+        system.refresh_process(self.process_pid);
+
+        let process = system
+            .get_process(self.process_pid)
+            .ok_or(ExecutionError::from(PythonRuntimeError::RuntimeDead))?;
+
+        match process.status() {
+            ProcessStatus::Run => Ok(()),
+            _ => Err(ExecutionError::from(PythonRuntimeError::RuntimeDead)),
+        }
+    }
 }
 
 impl Runtime for PythonRuntime {
@@ -35,6 +66,11 @@ impl Runtime for PythonRuntime {
         artifact: ArtifactId,
         spec: Any,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+        match self.ensure_runtime() {
+            Ok(()) => {}
+            Err(e) => return Box::new(Err(e).into_future()),
+        }
+
         let mut python_interface = PYTHON_INTERFACE.write().expect("Interface read");
 
         let spec_bytes = spec.to_bytes();
@@ -68,6 +104,10 @@ impl Runtime for PythonRuntime {
 
     /// TODO
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
+        if !self.ensure_runtime().is_ok() {
+            return false;
+        }
+
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
         unsafe {
@@ -78,6 +118,8 @@ impl Runtime for PythonRuntime {
 
     /// TODO
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+        self.ensure_runtime()?;
+
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
         let result = unsafe {
@@ -100,11 +142,15 @@ impl Runtime for PythonRuntime {
         _descriptor: InstanceDescriptor,
         _parameters: Any,
     ) -> Result<(), ExecutionError> {
+        self.ensure_runtime()?;
+
         Ok(())
     }
 
     /// TODO
     fn stop_service(&mut self, _descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
+        self.ensure_runtime()?;
+
         Ok(())
     }
 
@@ -115,11 +161,15 @@ impl Runtime for PythonRuntime {
         _call_info: &CallInfo,
         _payload: &[u8],
     ) -> Result<(), ExecutionError> {
+        self.ensure_runtime()?;
+
         Ok(())
     }
 
     /// TODO
     fn artifact_protobuf_spec(&self, _id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
+        self.ensure_runtime().ok()?;
+
         // self.deployed_artifacts
         //     .get(id)
         //     .map(|_| ArtifactProtobufSpec::default())
@@ -128,11 +178,19 @@ impl Runtime for PythonRuntime {
 
     /// TODO
     fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
+        if !self.ensure_runtime().is_ok() {
+            return StateHashAggregator::default();
+        }
+
         StateHashAggregator::default()
     }
 
     /// TODO
-    fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {}
+    fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {
+        if !self.ensure_runtime().is_ok() {
+            return;
+        }
+    }
 
     /// TODO
     fn after_commit(
@@ -142,6 +200,9 @@ impl Runtime for PythonRuntime {
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,
     ) {
+        if !self.ensure_runtime().is_ok() {
+            return;
+        }
     }
 }
 

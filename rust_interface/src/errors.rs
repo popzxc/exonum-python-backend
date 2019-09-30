@@ -5,7 +5,10 @@ use exonum_derive::IntoExecutionError;
 #[exonum(kind = "runtime")]
 pub enum PythonRuntimeError {
     /// PythonRuntime is not ready yet for work.
-    RuntimeNotReady = 0,
+    RuntimeNotReady = 1,
+
+    /// PythonRuntime process is dead.
+    RuntimeDead = 2,
 
     /// Undefined kind of error.
     /// Receiving that kind of error probably means that something wrong with runtime implementation.

@@ -1,8 +1,7 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::ffi::CStr;
-use std::os::raw::c_char;
+use std::process::Command;
 
 use exonum::runtime::Runtime;
 
@@ -12,25 +11,20 @@ mod python_interface;
 mod runtime;
 mod types;
 
+use runtime::PythonRuntime;
+
 // TODO return result
-pub fn initialize_python_backend() -> Option<Box<dyn Runtime>> {
-    None
-}
+pub fn initialize_python_backend(python_config_path: &str) -> Option<Box<dyn Runtime>> {
+    let python_run_command = Command::new("python")
+        .arg("-m runtime")
+        .arg(python_config_path);
 
-// To be removed
-type CCallbackType = unsafe extern "C" fn(a: u32, b: u32) -> u32;
+    let python_process = match python_run_command.spawn() {
+        Ok(handle) => handle,
+        Err(_) => return None,
+    };
 
-#[no_mangle]
-unsafe fn test(a: u32, hi: *const c_char) -> u32 {
-    let hi_str = CStr::from_ptr(hi).to_string_lossy().into_owned();
-    println!("Hello from rust! {}", hi_str);
-    a
-}
+    let python_runtime = PythonRuntime::new(python_process);
 
-#[no_mangle]
-fn test2(f: CCallbackType) {
-    unsafe {
-        let aaa = f(1, 2);
-        println!("Got {}", aaa);
-    }
+    Some(Box::new(python_runtime))
 }
