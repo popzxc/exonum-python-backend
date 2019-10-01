@@ -6,20 +6,19 @@ use sysinfo::{Pid, ProcessExt, ProcessStatus, RefreshKind, System, SystemExt};
 use exonum::{
     crypto::{PublicKey, SecretKey},
     node::ApiSender,
-    proto::Any,
     runtime::{
-        dispatcher::{Dispatcher, DispatcherSender},
+        dispatcher::{DispatcherRef, DispatcherSender},
         ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
         InstanceDescriptor, InstanceSpec, Runtime, StateHashAggregator,
     },
 };
-use exonum_merkledb::{BinaryValue, Fork, Snapshot};
+use exonum_merkledb::{Fork, Snapshot};
 
 use super::{
     errors::PythonRuntimeError,
     pending_deployment::PendingDeployment,
     python_interface::{PythonRuntimeInterface, PYTHON_INTERFACE},
-    types::{into_ptr_and_len, RawArtifactId, RawInstanceSpec},
+    types::{into_ptr_and_len, RawArtifactId, RawInstanceDescriptor, RawInstanceSpec},
 };
 
 /// Sample runtime.
@@ -64,7 +63,7 @@ impl Runtime for PythonRuntime {
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
-        spec: Any,
+        spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         match self.ensure_runtime() {
             Ok(()) => {}
@@ -73,12 +72,10 @@ impl Runtime for PythonRuntime {
 
         let mut python_interface = PYTHON_INTERFACE.write().expect("Interface read");
 
-        let spec_bytes = spec.to_bytes();
-
         // Call the python side of `deploy_artifact`.
         let result = unsafe {
             let python_artifact_id = RawArtifactId::from_artifact_id(&artifact);
-            let (spec_bytes_ptr, spec_bytes_len) = into_ptr_and_len(&spec_bytes);
+            let (spec_bytes_ptr, spec_bytes_len) = into_ptr_and_len(&spec);
             (python_interface.methods.deploy_artifact)(
                 python_artifact_id,
                 spec_bytes_ptr,
@@ -133,15 +130,29 @@ impl Runtime for PythonRuntime {
     }
 
     /// TODO
-    fn configure_service(
+    fn initialize_service(
         &self,
         _context: &Fork,
-        _descriptor: InstanceDescriptor,
-        _parameters: Any,
+        descriptor: InstanceDescriptor,
+        parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         self.ensure_runtime()?;
 
-        Ok(())
+        let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
+
+        let result = unsafe {
+            let python_instance_descriptor =
+                RawInstanceDescriptor::from_instance_descriptor(&descriptor);
+
+            let (parameters_bytes_ptr, parameters_bytes_len) = into_ptr_and_len(&parameters);
+            (python_interface.methods.initialize_service)(
+                python_instance_descriptor,
+                parameters_bytes_ptr,
+                parameters_bytes_len as u64,
+            )
+        };
+
+        PythonRuntimeInterface::error_code_to_result(result).map_err(From::from)
     }
 
     /// TODO
@@ -183,7 +194,7 @@ impl Runtime for PythonRuntime {
     }
 
     /// TODO
-    fn before_commit(&self, _dispatcher: &Dispatcher, _fork: &mut Fork) {
+    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {
         if self.ensure_runtime().is_err() {
             return;
         }

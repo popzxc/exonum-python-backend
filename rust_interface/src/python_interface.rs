@@ -46,7 +46,7 @@ type PythonDeployArtifactMethod =
     unsafe extern "C" fn(artifact: RawArtifactId, spec: *const u8, spec_len: u64) -> u32;
 type PythonIsArtifactDeployedMethod = unsafe extern "C" fn(artifact: RawArtifactId) -> bool;
 type PythonStartServiceMethod = unsafe extern "C" fn(spec: RawInstanceSpec) -> u32;
-type PythonConfigureServiceMethod = unsafe extern "C" fn(
+type PythonInitializeServiceMethod = unsafe extern "C" fn(
     descriptor: RawInstanceDescriptor,
     parameters: *const u8,
     parameters_len: u64,
@@ -67,7 +67,7 @@ pub struct PythonMethods {
     pub deploy_artifact: PythonDeployArtifactMethod,
     pub is_artifact_deployed: PythonIsArtifactDeployedMethod,
     pub start_service: PythonStartServiceMethod,
-    pub configure_service: PythonConfigureServiceMethod,
+    pub initialize_service: PythonInitializeServiceMethod,
     pub stop_service: PythonStopServiceMethod,
     pub execute: PythonExecuteMethod,
     pub artifact_protobuf_spec: PythonArtifactProtobufSpecMethod,
@@ -83,7 +83,7 @@ impl Default for PythonMethods {
             deploy_artifact: default_deploy,
             is_artifact_deployed: default_is_artifact_deployed,
             start_service: default_start_service,
-            configure_service: default_configure_service_method,
+            initialize_service: default_initialize_service_method,
             stop_service: default_stop_service_method,
             execute: default_execute_method,
             artifact_protobuf_spec: default_artifact_protobuf_spec_method,
@@ -99,9 +99,7 @@ impl Default for PythonMethods {
 /// This function is meant to be called by the python side during the initialization.
 #[no_mangle]
 pub unsafe extern "C" fn init_python_side(methods: *const PythonMethods) {
-    println!("AAA");
     let mut python_interface = PYTHON_INTERFACE.write().expect("Excepted write");
-    println!("BBBB");
 
     (*python_interface).methods = *methods;
 }
@@ -133,6 +131,8 @@ fn deployment_completed(python_artifact: RawArtifactId, result: u32) {
     }
 }
 
+// Blank implementations to avoid storing `Option`.
+
 unsafe extern "C" fn default_deploy(
     _artifact: RawArtifactId,
     _spec: *const u8,
@@ -149,7 +149,7 @@ unsafe extern "C" fn default_start_service(_spec: RawInstanceSpec) -> u32 {
     PythonRuntimeError::RuntimeNotReady as u32
 }
 
-unsafe extern "C" fn default_configure_service_method(
+unsafe extern "C" fn default_initialize_service_method(
     _descriptor: RawInstanceDescriptor,
     _parameters: *const u8,
     _parameters_len: u64,

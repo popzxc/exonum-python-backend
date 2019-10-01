@@ -1,10 +1,17 @@
 """C callbacks to be provided to Rust"""
 
-from typing import Any, Set
+from typing import Set
 import ctypes as c
 
-from .types import RuntimeInterface, DeploymentResult
-from .raw_types import *
+from .raw_types import (
+    RawArtifactId,
+    RawInstanceDescriptor,
+    RawInstanceSpec,
+    RawCallInfo,
+    RawStateHashAggregator,
+    RawArtifactProtobufSpec,
+    RawPythonMethods,
+)
 from .ffi import RustFFIProvider
 
 # Dynamically allocated resources
@@ -49,7 +56,7 @@ def start_service(raw_spec):  # type: ignore # Signature is one line above.
 
 
 @c.CFUNCTYPE(c.c_uint32, RawInstanceDescriptor, c.POINTER(c.c_uint8), c.c_uint32)
-def configure_service(descriptor, parameters, parameters_len):  # type: ignore # Signature is one line above.
+def initialize_service(descriptor, parameters, parameters_len):  # type: ignore # Signature is one line above.
     """Configure service instance"""
     instance_descriptor = descriptor.into_instance_descriptor()
 
@@ -57,7 +64,7 @@ def configure_service(descriptor, parameters, parameters_len):  # type: ignore #
 
     ffi = RustFFIProvider.instance()
 
-    result = ffi.runtime().configure_service(instance_descriptor, parameters_bytes)
+    result = ffi.runtime().initialize_service(instance_descriptor, parameters_bytes)
 
     return result.value
 
@@ -124,14 +131,16 @@ def artifact_protobuf_spec(raw_artifact_id, spec):  # type: ignore # Signature i
 
 
 @c.CFUNCTYPE(None)
-def before_commit():
+def before_commit():  # type: ignore # Signature is one line above.
+    """Before commit callback."""
     ffi = RustFFIProvider.instance()
 
     ffi.runtime().before_commit()
 
 
 @c.CFUNCTYPE(None)
-def after_commit():
+def after_commit():  # type: ignore # Signature is one line above.
+    """After commit callback."""
     ffi = RustFFIProvider.instance()
 
     ffi.runtime().after_commit()
@@ -150,7 +159,7 @@ def build_callbacks() -> RawPythonMethods:
         deploy_artifact=c.cast(deploy_artifact, c.c_void_p),
         is_artifact_deployed=c.cast(is_artifact_deployed, c.c_void_p),
         start_service=c.cast(start_service, c.c_void_p),
-        configure_service=c.cast(configure_service, c.c_void_p),
+        initialize_service=c.cast(initialize_service, c.c_void_p),
         stop_service=c.cast(stop_service, c.c_void_p),
         execute=c.cast(execute, c.c_void_p),
         artifact_protobuf_spec=c.cast(artifact_protobuf_spec, c.c_void_p),

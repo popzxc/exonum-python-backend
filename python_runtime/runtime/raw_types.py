@@ -12,7 +12,7 @@ class RawPythonMethods(c.Structure):
         ("deploy_artifact", c.c_void_p),
         ("is_artifact_deployed", c.c_void_p),
         ("start_service", c.c_void_p),
-        ("configure_service", c.c_void_p),
+        ("initialize_service", c.c_void_p),
         ("stop_service", c.c_void_p),
         ("execute", c.c_void_p),
         ("artifact_protobuf_spec", c.c_void_p),
@@ -152,7 +152,6 @@ class RawStateHashAggregator(c.Structure):
         raw_length_array = (c.c_uint32 * overall_amount)(*length_array)
         raw_instance_ids_array = (c.c_uint32 * instances_amount)(*instance_ids_array)
 
-        # TODO is pointer required here?
         return cls(
             hashes=raw_hashes_array,
             hashes_length=raw_length_array,
