@@ -22,6 +22,7 @@ from .config import Configuration
 from .crypto import KeyPair
 from .ffi import RustFFIProvider
 from .proto.protobuf import PythonArtifactSpec, ParseError
+from .runtime_api import RuntimeApi
 
 
 class Instance:
@@ -42,6 +43,8 @@ class PythonRuntime(RuntimeInterface):
         self._pending_deployments: Dict[ArtifactId, Artifact] = {}
         self._artifacts: Dict[ArtifactId, Artifact] = {}
         self._instances: Dict[InstanceSpec, Instance] = {}
+
+        self._runtime_api = RuntimeApi(port=8080)
 
         self._init_artifacts()
 

@@ -3,6 +3,12 @@ import asyncio
 import sys
 import os
 
+import tornado.concurrent
+import tornado.ioloop
+import tornado.web
+import tornado.platform.asyncio
+import tornado.httpclient
+
 from .runtime import PythonRuntime
 
 
@@ -10,7 +16,9 @@ def main() -> None:
     """Starts the Exonum Python Runtime."""
     config_path = parse_args()
 
-    loop = asyncio.new_event_loop()
+    loop = asyncio.get_event_loop()
+
+    tornado.platform.asyncio.AsyncIOMainLoop().install()
 
     _runtime = PythonRuntime(loop, config_path)
 
