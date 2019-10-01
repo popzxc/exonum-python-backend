@@ -1,7 +1,10 @@
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
-use exonum::runtime::{ArtifactId, CallInfo, InstanceDescriptor, InstanceSpec};
+use exonum::crypto::Hash;
+use exonum::runtime::{
+    ArtifactId, CallInfo, InstanceDescriptor, InstanceId, InstanceSpec, StateHashAggregator,
+};
 
 pub unsafe fn into_ptr_and_len(data: &[u8]) -> (*const u8, usize) {
     let data_ptr: *const u8 = data.as_ptr();
@@ -118,4 +121,76 @@ impl From<RawCallInfo> for CallInfo {
             method_id: call_info.method_id,
         }
     }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RawHash {
+    pub data: *const u8,
+}
+
+impl From<RawHash> for Hash {
+    fn from(raw_hash: RawHash) -> Hash {
+        let slice = unsafe { std::slice::from_raw_parts(raw_hash.data, 32) };
+
+        Hash::from_slice(slice).expect("Incorrect hash recieved from Python")
+    }
+}
+
+#[repr(C)]
+pub struct RawStateHashAggregator {
+    pub hashes: *const (*const RawHash),
+    pub hashes_length: *const u32,
+    pub instance_ids: *const u32,
+    pub length: u32,
+}
+
+impl From<RawStateHashAggregator> for StateHashAggregator {
+    fn from(raw_aggregator: RawStateHashAggregator) -> StateHashAggregator {
+        let overall_length: usize = raw_aggregator.length as usize;
+        let runtimes_ids_length: usize = overall_length - 1;
+
+        let hashes = unsafe { std::slice::from_raw_parts(raw_aggregator.hashes, overall_length) };
+        let hashes_lengths =
+            unsafe { std::slice::from_raw_parts(raw_aggregator.hashes_length, overall_length) };
+        let instance_ids =
+            unsafe { std::slice::from_raw_parts(raw_aggregator.instance_ids, runtimes_ids_length) };
+
+        let runtime_hashes = unsafe {
+            std::slice::from_raw_parts(hashes[0], hashes_lengths[0] as usize)
+                .iter()
+                .map(|h| Hash::from(*h))
+                .collect()
+        };
+
+        let instances_hashes: Vec<(InstanceId, Vec<Hash>)> = (0..runtimes_ids_length)
+            .map(|i| {
+                let instance_hashes = unsafe {
+                    std::slice::from_raw_parts(hashes[i + 1], hashes_lengths[i + 1] as usize)
+                        .iter()
+                        .map(|h| Hash::from(*h))
+                        .collect()
+                };
+                let instance_id = instance_ids[i] as InstanceId;
+                (instance_id, instance_hashes)
+            })
+            .collect();
+
+        StateHashAggregator {
+            runtime: runtime_hashes,
+            instances: instances_hashes,
+        }
+    }
+}
+
+#[repr(C)]
+pub struct RawProtoSourceFile {
+    pub name: *const c_char,
+    pub content: *const c_char,
+}
+
+#[repr(C)]
+pub struct RawArtifactProtobufSpec {
+    pub files: *const RawProtoSourceFile,
+    pub files_amount: u32,
 }

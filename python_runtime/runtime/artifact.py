@@ -5,7 +5,7 @@ import os
 import sys
 import importlib
 
-from .types import ArtifactId, DeploymentResult, PythonRuntimeError
+from .types import ArtifactId, DeploymentResult, PythonRuntimeResult
 from .config import Configuration
 from .proto.protobuf import PythonArtifactSpec
 from .service import Service
@@ -45,9 +45,7 @@ class Artifact:
 
         # On successfull installation pip should return 0.
         if proc.returncode != 0:
-            result = DeploymentResult(
-                success=False, error=PythonRuntimeError.SERVICE_INSTALL_FAILED, artifact_id=self._id
-            )
+            result = DeploymentResult(result=PythonRuntimeResult.SERVICE_INSTALL_FAILED, artifact_id=self._id)
 
             future.set_result(result)
             return
@@ -56,9 +54,7 @@ class Artifact:
         try:
             service_module = importlib.import_module(self._spec.service_library_name)
         except (ModuleNotFoundError, ImportError):
-            result = DeploymentResult(
-                success=False, error=PythonRuntimeError.SERVICE_INSTALL_FAILED, artifact_id=self._id
-            )
+            result = DeploymentResult(result=PythonRuntimeResult.SERVICE_INSTALL_FAILED, artifact_id=self._id)
 
             future.set_result(result)
             return
@@ -71,15 +67,13 @@ class Artifact:
                 raise ValueError("Not a Service subclass")
 
         except (ValueError, AttributeError):
-            result = DeploymentResult(
-                success=False, error=PythonRuntimeError.SERVICE_INSTALL_FAILED, artifact_id=self._id
-            )
+            result = DeploymentResult(result=PythonRuntimeResult.SERVICE_INSTALL_FAILED, artifact_id=self._id)
 
             future.set_result(result)
             return
 
         self._service_class = service
-        result = DeploymentResult(success=True, error=None, artifact_id=self._id)
+        result = DeploymentResult(result=PythonRuntimeResult.OK, artifact_id=self._id)
         future.set_result(result)
 
     def get_service(self) -> Type[Service]:

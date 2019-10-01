@@ -11,11 +11,13 @@ from .types import (
     ArtifactId,
     InstanceSpec,
     DeploymentResult,
-    PythonRuntimeError,
+    PythonRuntimeResult,
     InstanceDescriptor,
     CallInfo,
     StateHashAggregator,
+    ArtifactProtobufSpec,
 )
+from .c_callbacks import build_callbacks
 from .config import Configuration
 from .crypto import KeyPair
 from .ffi import RustFFIProvider
@@ -36,7 +38,7 @@ class PythonRuntime(RuntimeInterface):
     def __init__(self, loop: asyncio.AbstractEventLoop, config_path: str) -> None:
         self._loop = loop
         self._configuration = Configuration(config_path)
-        self._rust_ffi = RustFFIProvider(self._configuration.rust_lib_path, self)
+        self._rust_ffi = RustFFIProvider(self._configuration.rust_lib_path, self, build_callbacks())
         self._pending_deployments: Dict[ArtifactId, Artifact] = {}
         self._artifacts: Dict[ArtifactId, Artifact] = {}
         self._instances: Dict[InstanceSpec, Instance] = {}
@@ -63,19 +65,21 @@ class PythonRuntime(RuntimeInterface):
         result: DeploymentResult = future.result()
 
         self._rust_ffi.deploy_completed(result)
-        if result.success:
+        if result.result == PythonRuntimeResult.OK:
             artifact_id = result.artifact_id
             artifact = self._pending_deployments[result.artifact_id]
             self._artifacts[artifact_id] = artifact
-            del self._pending_deployments[result.artifact_id]
+
+        # Service is removed from pending deployments no matter how deployment ended.
+        del self._pending_deployments[result.artifact_id]
 
     # Implementation of RuntimeInterface.
 
-    def request_deploy(self, artifact_id: ArtifactId, artifact_spec: bytes) -> Optional[PythonRuntimeError]:
+    def request_deploy(self, artifact_id: ArtifactId, artifact_spec: bytes) -> PythonRuntimeResult:
         try:
             spec = PythonArtifactSpec.from_bytes(artifact_spec)
         except ParseError:
-            return PythonRuntimeError.WRONG_SPEC
+            return PythonRuntimeResult.WRONG_SPEC
 
         artifact = Artifact(artifact_id, spec, self._configuration)
 
@@ -86,21 +90,24 @@ class PythonRuntime(RuntimeInterface):
 
         self._pending_deployments[artifact_id] = artifact
 
-        return None
+        return PythonRuntimeResult.OK
 
     def is_artifact_deployed(self, artifact_id: ArtifactId) -> bool:
         return artifact_id in self._artifacts
 
-    def start_instance(self, instance_spec: InstanceSpec) -> Optional[PythonRuntimeError]:
+    def start_instance(self, instance_spec: InstanceSpec) -> PythonRuntimeResult:
         raise NotImplementedError
 
-    def initialize_service(self, instance: InstanceDescriptor, parameters: bytes) -> Optional[PythonRuntimeError]:
+    def initialize_service(self, instance: InstanceDescriptor, parameters: bytes) -> PythonRuntimeResult:
         raise NotImplementedError
 
-    def stop_service(self, instance: InstanceDescriptor) -> Optional[PythonRuntimeError]:
+    def stop_service(self, instance: InstanceDescriptor) -> PythonRuntimeResult:
         raise NotImplementedError
 
-    def execute(self, call_info: CallInfo, arguments: bytes) -> Optional[PythonRuntimeError]:
+    def execute(self, call_info: CallInfo, arguments: bytes) -> PythonRuntimeResult:
+        raise NotImplementedError
+
+    def artifact_protobuf_spec(self, artifact: ArtifactId) -> Optional[ArtifactProtobufSpec]:
         raise NotImplementedError
 
     def state_hashes(self) -> StateHashAggregator:

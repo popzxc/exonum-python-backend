@@ -10,6 +10,12 @@ pub enum PythonRuntimeError {
     /// PythonRuntime process is dead.
     RuntimeDead = 2,
 
+    /// Python artifact spec is incorrect.
+    WrongSpec = 16,
+
+    /// Error occured during deployment process.
+    ServiceInstallFailed = 17,
+
     /// Undefined kind of error.
     /// Receiving that kind of error probably means that something wrong with runtime implementation.
     Other = 255,
@@ -18,7 +24,12 @@ pub enum PythonRuntimeError {
 impl PythonRuntimeError {
     pub fn from_value(value: u32) -> PythonRuntimeError {
         match value {
-            0 => PythonRuntimeError::RuntimeNotReady,
+            1 => PythonRuntimeError::RuntimeNotReady,
+            2 => PythonRuntimeError::RuntimeDead,
+
+            16 => PythonRuntimeError::WrongSpec,
+            17 => PythonRuntimeError::ServiceInstallFailed,
+
             _ => PythonRuntimeError::Other,
         }
     }

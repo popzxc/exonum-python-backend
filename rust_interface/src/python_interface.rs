@@ -53,7 +53,7 @@ type PythonConfigureServiceMethod = unsafe extern "C" fn(
 ) -> u32;
 type PythonStopServiceMethod = unsafe extern "C" fn(descriptor: RawInstanceDescriptor) -> u32;
 type PythonExecuteMethod =
-    unsafe extern "C" fn(call_info: RawCallInfo, payload: *const u8, payload_len: u8) -> u32;
+    unsafe extern "C" fn(call_info: RawCallInfo, payload: *const u8, payload_len: u32) -> u32;
 type PythonArtifactProtobufSpecMethod = unsafe extern "C" fn();
 type PythonStateHashesMethod = unsafe extern "C" fn();
 type PythonBeforeCommitMethod = unsafe extern "C" fn();
@@ -62,7 +62,7 @@ type PythonFreeResourceMethod = unsafe extern "C" fn(resource: *const c_void);
 
 /// Structure with the Python side API.
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct PythonMethods {
     pub deploy_artifact: PythonDeployArtifactMethod,
     pub is_artifact_deployed: PythonIsArtifactDeployedMethod,
@@ -98,10 +98,12 @@ impl Default for PythonMethods {
 /// Initialize python interfaces.
 /// This function is meant to be called by the python side during the initialization.
 #[no_mangle]
-fn init_python_side(methods: PythonMethods) {
+pub unsafe extern "C" fn init_python_side(methods: *const PythonMethods) {
+    println!("AAA");
     let mut python_interface = PYTHON_INTERFACE.write().expect("Excepted write");
+    println!("BBBB");
 
-    (*python_interface).methods = methods;
+    (*python_interface).methods = *methods;
 }
 
 /// Removes an artifact from the pending deployments.
@@ -162,7 +164,7 @@ unsafe extern "C" fn default_stop_service_method(_descriptor: RawInstanceDescrip
 unsafe extern "C" fn default_execute_method(
     _call_info: RawCallInfo,
     _payload: *const u8,
-    _payload_len: u8,
+    _payload_len: u32,
 ) -> u32 {
     PythonRuntimeError::RuntimeNotReady as u32
 }

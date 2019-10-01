@@ -13,6 +13,8 @@ mod types;
 
 use runtime::PythonRuntime;
 
+pub use python_interface::init_python_side;
+
 // TODO return result
 pub fn initialize_python_backend(python_config_path: &str) -> Option<Box<dyn Runtime>> {
     let python_run_command = Command::new("python")
