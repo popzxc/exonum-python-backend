@@ -11,6 +11,8 @@ pub struct RawListIndexMethods {
     pub push: ListIndexPush,
     pub pop: ListIndexPop,
     pub len: ListIndexLen,
+    pub set: ListIndexSet,
+    pub clear: ListIndexClear,
 }
 
 impl Default for RawListIndexMethods {
@@ -20,6 +22,8 @@ impl Default for RawListIndexMethods {
             push,
             pop,
             len,
+            set,
+            clear,
         }
     }
 }
@@ -49,6 +53,8 @@ type ListIndexPop =
     unsafe extern "C" fn(index: *const RawListIndex, allocate: Allocate) -> BinaryData;
 type ListIndexPush = unsafe extern "C" fn(index: *const RawListIndex, value: BinaryData);
 type ListIndexLen = unsafe extern "C" fn(index: *const RawListIndex) -> u64;
+type ListIndexSet = unsafe extern "C" fn(index: *const RawListIndex, idx: u64, value: BinaryData);
+type ListIndexClear = unsafe extern "C" fn(index: *const RawListIndex);
 
 unsafe extern "C" fn get(index: *const RawListIndex, idx: u64, allocate: Allocate) -> BinaryData {
     let index = &*index;
@@ -123,4 +129,25 @@ unsafe extern "C" fn len(index: *const RawListIndex) -> u64 {
     let index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
 
     index.len() as u64
+}
+
+unsafe extern "C" fn set(index: *const RawListIndex, idx: u64, value: BinaryData) {
+    let index = &*index;
+    let index_name = parse_string(index.index_name);
+    let value: Vec<u8> = value.to_vec();
+
+    let fork = &*index.fork;
+    let mut index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
+
+    index.set(idx, value);
+}
+
+unsafe extern "C" fn clear(index: *const RawListIndex) {
+    let index = &*index;
+    let index_name = parse_string(index.index_name);
+
+    let fork = &*index.fork;
+    let mut index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
+
+    index.clear();
 }

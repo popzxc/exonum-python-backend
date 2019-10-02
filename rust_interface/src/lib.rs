@@ -14,7 +14,10 @@ mod types;
 
 use runtime::PythonRuntime;
 
-pub use merkledb_interface::list_index::merkledb_list_index;
+pub use merkledb_interface::{
+    list_index::merkledb_list_index, map_index::merkledb_map_index,
+    proof_list_index::merkledb_proof_list_index, proof_map_index::merkledb_proof_map_index,
+};
 pub use python_interface::init_python_side;
 
 // TODO return result
