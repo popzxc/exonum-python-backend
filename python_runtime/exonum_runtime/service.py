@@ -2,6 +2,17 @@
 import abc
 from typing import List
 
+from .crypto import Hash
+
+
+class ServiceError(Exception):
+    """Errors that can be raised by the service."""
+
+    def __init__(self, code: int, description: str) -> None:
+        super().__init__(description)
+        self.code = code
+        self.description = description
+
 
 class Service(metaclass=abc.ABCMeta):
     """Base interface for every Exonum Python service."""
@@ -18,7 +29,7 @@ class Service(metaclass=abc.ABCMeta):
         to interact with instances of this service."""
 
     @abc.abstractmethod
-    def update_configuration(self, new_config: bytes) -> None:
+    def initialize(self, new_config: bytes) -> None:
         """Method called when a new configuration for service instance is available."""
 
     @abc.abstractmethod
@@ -32,6 +43,10 @@ class Service(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def after_commit(self) -> None:
         """Method called after the block commit."""
+
+    @abc.abstractmethod
+    def state_hashes(self) -> List[Hash]:
+        """Should return hashes of indices used by service."""
 
     @abc.abstractmethod
     def wire_api(self) -> None:

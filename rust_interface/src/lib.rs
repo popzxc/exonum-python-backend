@@ -6,6 +6,7 @@ use std::process::Command;
 use exonum::runtime::Runtime;
 
 mod errors;
+pub mod merkledb_interface;
 mod pending_deployment;
 mod python_interface;
 mod runtime;
@@ -13,6 +14,7 @@ mod types;
 
 use runtime::PythonRuntime;
 
+pub use merkledb_interface::list_index::merkledb_list_index;
 pub use python_interface::init_python_side;
 
 // TODO return result

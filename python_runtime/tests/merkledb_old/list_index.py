@@ -3,9 +3,9 @@
 import unittest
 
 from runtime.crypto import KeyPair
-from runtime.merkledb.backends import MemoryDB
-from runtime.merkledb.index_owner import IndexOwner
-from runtime.merkledb.indices import ListIndex
+from runtime.merkledb_old.backends import MemoryDB
+from runtime.merkledb_old.index_owner import IndexOwner
+from runtime.merkledb_old.indices import ListIndex
 
 
 class TestListIndex(unittest.TestCase):

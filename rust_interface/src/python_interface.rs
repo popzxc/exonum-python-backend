@@ -3,6 +3,7 @@ use std::os::raw::c_void;
 use std::sync::RwLock;
 
 use exonum::runtime::ArtifactId;
+use exonum_merkledb::Fork;
 
 use super::{
     errors::PythonRuntimeError,
@@ -57,7 +58,7 @@ type PythonExecuteMethod =
 type PythonArtifactProtobufSpecMethod = unsafe extern "C" fn();
 type PythonStateHashesMethod = unsafe extern "C" fn();
 type PythonBeforeCommitMethod = unsafe extern "C" fn();
-type PythonAfterCommitMethod = unsafe extern "C" fn();
+type PythonAfterCommitMethod = unsafe extern "C" fn(fork: *const Fork);
 type PythonFreeResourceMethod = unsafe extern "C" fn(resource: *const c_void);
 
 /// Structure with the Python side API.
@@ -89,11 +90,13 @@ impl Default for PythonMethods {
             artifact_protobuf_spec: default_artifact_protobuf_spec_method,
             state_hashes: default_state_hashes_method,
             before_commit: default_before_commit_method,
-            after_commit: default_after_ommit_method,
+            after_commit: default_after_commit_method,
             free_resource: default_free_resource_method,
         }
     }
 }
+
+use exonum_merkledb::{Database, TemporaryDB};
 
 /// Initialize python interfaces.
 /// This function is meant to be called by the python side during the initialization.
@@ -101,7 +104,12 @@ impl Default for PythonMethods {
 pub unsafe extern "C" fn init_python_side(methods: *const PythonMethods) {
     let mut python_interface = PYTHON_INTERFACE.write().expect("Excepted write");
 
+    let db = TemporaryDB::default();
+    let fork = db.fork();
+
     (*python_interface).methods = *methods;
+
+    ((*python_interface).methods.after_commit)(&fork as *const Fork);
 }
 
 /// Removes an artifact from the pending deployments.
@@ -171,5 +179,5 @@ unsafe extern "C" fn default_execute_method(
 unsafe extern "C" fn default_artifact_protobuf_spec_method() {}
 unsafe extern "C" fn default_state_hashes_method() {}
 unsafe extern "C" fn default_before_commit_method() {}
-unsafe extern "C" fn default_after_ommit_method() {}
+unsafe extern "C" fn default_after_commit_method(_fork: *const Fork) {}
 unsafe extern "C" fn default_free_resource_method(_resource: *const c_void) {}

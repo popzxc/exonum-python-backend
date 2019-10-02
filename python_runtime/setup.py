@@ -11,7 +11,7 @@ setup(
     version="0.1",
     description="Exonum Python Runtime",
     url="https://github.com/popzxc/exonum-python-backend",
-    packages=["runtime"],
+    packages=["exonum_runtime"],
     install_requires=INSTALL_REQUIRES,
     python_requires=PYTHON_REQUIRES,
 )

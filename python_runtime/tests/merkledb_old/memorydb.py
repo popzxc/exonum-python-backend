@@ -2,7 +2,7 @@
 
 import unittest
 
-from runtime.merkledb.backends import MemoryDB
+from runtime.merkledb_old.backends import MemoryDB
 
 
 class TestMemoryDB(unittest.TestCase):

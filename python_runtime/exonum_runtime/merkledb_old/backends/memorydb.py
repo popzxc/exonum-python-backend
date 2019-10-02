@@ -2,7 +2,7 @@
 
 from typing import Optional, Dict
 
-from runtime.merkledb.db import Database, Fork, Snapshot
+from exonum_runtime.merkledb_old.db import Database, Fork, Snapshot
 
 
 class DbOptions:

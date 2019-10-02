@@ -1,5 +1,5 @@
 """TODO"""
-from typing import Optional, Any
+from typing import Optional, Any, Type, Dict
 import abc
 
 
@@ -49,6 +49,17 @@ class Snapshot(metaclass=abc.ABCMeta):
 
 class Database(metaclass=abc.ABCMeta):
     """TODO"""
+
+    _DATABASE_PROVIDER: Optional[Type["Database"]] = None
+    _DATABASE_META: Optional[Dict[Any, Any]] = None
+
+    @classmethod
+    def register_database_provider(cls, database_provider: Type[Database]):
+        """Registers a database backend.
+
+        Raises an RuntimeError if backend is already registered."""
+        if cls._DATABASE_PROVIDER is not None:
+            raise RuntimeError("Database provider is already registered")
 
     @abc.abstractmethod
     def fork(self, name: str, family: Optional[str] = None) -> Fork:
