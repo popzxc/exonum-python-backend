@@ -147,6 +147,17 @@ def after_commit(_fork):  # type: ignore # Signature is one line above.
     ffi.runtime().after_commit()
 
 
+@c.CFUNCTYPE(c.c_void_p, c.c_uint64)
+def allocate(length: u64):  # type: ignore # Signature is one line above.
+    """Request for memory allocation."""
+    data = c.c_uint8 * length
+
+    raw_data_ptr = c.cast(data, c.c_void_p)
+    RESOURCES.add(raw_data_ptr)
+
+    return raw_data_ptr
+
+
 @c.CFUNCTYPE(None, c.c_void_p)
 def free_resource(resource):  # type: ignore # Signature is one line above.
     """Callback called when resource is consumed and can be freed."""
