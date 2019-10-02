@@ -1,32 +1,40 @@
 """TODO"""
 
-import abc
-from typing import Optional
+import ctypes as c
+from typing import Optional, Any
 
 
-class Fork(metaclass=abc.ABCMeta):
-    """A write access to the database."""
+class Access:
+    """A generic access to the database."""
 
-    @abc.abstractmethod
-    def put(self, key: bytes, value: bytes) -> None:
-        """Puts a value into database."""
+    def __init__(self, inner: c.c_void_p):
+        self._inner = inner
+        self._valid = False
 
-    @abc.abstractmethod
-    def delete(self, key: bytes) -> None:
-        """Removes a value from the database."""
+    def __enter__(self) -> "Access":
+        self._valid = True
 
-    @abc.abstractmethod
-    def merge(self) -> None:
-        """Merges the fork into the database and closes it."""
+        return self
+
+    def __exit__(self, exc_type: Optional[type], exc_value: Optional[Any], exc_traceback: Optional[object]) -> None:
+        self._valid = False
+
+    def valid(self) -> bool:
+        """Returns True if access is valid and can be used."""
+        return self._valid
+
+    def inner(self) -> c.c_void_p:
+        """Returns the inner access pointer."""
+        if not self.valid():
+            raise RuntimeError("Access is not valid anymore")
+
+        return self._inner
 
 
-class Snapshot(metaclass=abc.ABCMeta):
-    """A read access to the database."""
+class Fork(Access):
+    """Write access to the database."""
 
-    @abc.abstractmethod
-    def get(self, key: bytes) -> Optional[bytes]:
-        """Gets the value from the database."""
 
-    @abc.abstractmethod
-    def close(self) -> None:
-        """Closes the snapshot so it won't be accessed anymore."""
+class Snapshot(Access):
+    """Read access to the database."""
+

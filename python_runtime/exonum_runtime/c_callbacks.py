@@ -139,31 +139,12 @@ def before_commit():  # type: ignore # Signature is one line above.
 
 
 @c.CFUNCTYPE(None, c.c_void_p)
-def after_commit(fork):  # type: ignore # Signature is one line above.
+def after_commit(_fork):  # type: ignore # Signature is one line above.
     """After commit callback."""
-    from .ffi import BinaryData
-
     ffi = RustFFIProvider.instance()
 
-    d = b"abcd"
-    list_index = ffi._rust_interface.merkledb_list_index(fork, c.c_char_p(d))
-
-    data = b"123"
-    data_len = 3
-    data = BinaryData(c.cast(data, c.POINTER(c.c_uint8)), c.c_uint64(data_len))
-
-    print("INDEX {}".format(list_index.index_name))
-    length = list_index.len(list_index)
-
-    print(f"LEN {length}")
-
-    list_index.push(list_index, data)
-
-    length = list_index.len(list_index)
-
-    print(f"LEN {length}")
-
-    # ffi.runtime().after_commit()
+    # TODO fix call
+    ffi.runtime().after_commit()
 
 
 @c.CFUNCTYPE(None, c.c_void_p)

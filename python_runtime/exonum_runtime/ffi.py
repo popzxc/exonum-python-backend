@@ -6,6 +6,7 @@ from .types import RuntimeInterface, DeploymentResult
 from .raw_types import RawPythonMethods, RawArtifactId
 
 
+"""
 class BinaryData(c.Structure):
     _fields_ = [("data", c.POINTER(c.c_uint8)), ("data_len", c.c_uint64)]
 
@@ -23,6 +24,7 @@ RawListIndex._fields_ = [
     ("push", PushMethodType),
     ("len", LenMethodType),
 ]
+"""
 
 
 class RustFFIProvider:
@@ -54,8 +56,9 @@ class RustFFIProvider:
         # Init python-side signatures.
         self._rust_interface.init_python_side.argtypes = [c.POINTER(RawPythonMethods)]
         self._rust_interface.deployment_completed.argtypes = [RawArtifactId, c.c_uint32]
-        self._rust_interface.merkledb_list_index.argtypes = [c.c_void_p, c.c_char_p]
-        self._rust_interface.merkledb_list_index.restype = RawListIndex
+
+        # self._rust_interface.merkledb_list_index.argtypes = [c.c_void_p, c.c_char_p]
+        # self._rust_interface.merkledb_list_index.restype = RawListIndex
 
         # Init python side.
         self._rust_interface.init_python_side(c.byref(ffi_callbacks))

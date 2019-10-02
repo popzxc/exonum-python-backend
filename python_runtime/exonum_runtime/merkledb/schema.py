@@ -1,6 +1,8 @@
 """TODO"""
 
-from typing import Tuple, Dict, Any, List, NamedTuple
+from typing import Tuple, Dict, Any, List
+
+from .indices.base_index import BaseIndex
 
 
 class _WithSchemaMeta(type):
@@ -97,9 +99,10 @@ class _SchemaMeta(type):
         dct["_schema_meta"] = dict()
 
         for index_name, index_type in annotations:
-            dct["_schema_meta"][index_name] = index_type
+            if not issubclass(index_type, BaseIndex):
+                raise AttributeError(f"Incorrect index type: {index_type}")
 
-            # TODO ensure that index_type is subclass of BaseIndex
+            dct["_schema_meta"][index_name] = index_type
 
         new_class = super().__new__(cls, name, bases, dct)
         return new_class

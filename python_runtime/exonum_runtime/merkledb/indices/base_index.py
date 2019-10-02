@@ -1,34 +1,51 @@
 """TODO"""
-from typing import Optional
+from typing import Any, no_type_check, Tuple, Dict
+import functools
 
-from ..database import Fork, Snapshot
+from ..types import Access
 
 
 class IndexAccessError(Exception):
     """Error to be raised when mutable access requested without Fork."""
 
 
-class BaseIndex:
+class _BaseIndexMeta(type):
+    def __new__(cls, name: str, bases: Tuple[type, ...], dct: Dict[str, Any]) -> type:  # type: ignore
+        if name == "BaseIndex":
+            # Proxy class, skip it.
+            return super().__new__(cls, name, bases, dct)
+
+        if BaseIndex not in bases:
+            raise TypeError("Index classes should be derived from BaseIndex")
+
+        # Wrap all the public methods into `_ensure`.
+        for key in dct:
+            if not key.startswith("_") and callable(dct[key]):
+                dct[key] = _ensure(dct[key])
+
+        return super().__new__(cls, name, bases, dct)
+
+
+class BaseIndex(metaclass=_BaseIndexMeta):
     """Base interface to the database for indices."""
 
-    def __init__(self, snapshot: Snapshot, fork: Optional[Fork]) -> None:
-        self._snapshot = snapshot
-        self._fork = fork
+    def __init__(self, access: Access) -> None:
+        self._access = access
 
-    def put(self, key: bytes, value: bytes) -> None:
-        """Puts a value into db."""
-        if self._fork is None:
-            raise IndexAccessError
+    def ensure_access(self) -> None:
+        """Raises an exception if access is expired."""
+        if not self._access.valid():
+            raise IndexAccessError("Access to index expired")
 
-        self._fork.put(key, value)
 
-    def delete(self, key: bytes) -> None:
-        """Removes a value from db."""
-        if self._fork is None:
-            raise IndexAccessError
+@no_type_check
+def _ensure(method):
+    """Ensures that access is still valid, raises an exception otherwise."""
 
-        self._fork.delete(key)
+    @functools.wraps(method)
+    def ensure_handler(obj: BaseIndex, *args: Any, **kwargs: Any) -> Any:
+        obj.ensure_access()
 
-    def get(self, key: bytes) -> Optional[bytes]:
-        """Gets a value from db."""
-        return self._snapshot.get(key)
+        return method(obj, *args, **kwargs)
+
+    return ensure_handler
