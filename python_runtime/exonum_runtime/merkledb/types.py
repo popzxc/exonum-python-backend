@@ -37,4 +37,3 @@ class Fork(Access):
 
 class Snapshot(Access):
     """Read access to the database."""
-

@@ -38,6 +38,11 @@ class BaseIndex(metaclass=_BaseIndexMeta):
         else:
             self._index_id = bytes(f"{instance_name}.{index_name}.{family}", "utf-8")
 
+        self.initialize()
+
+    def initialize(self) -> None:
+        """Method to be overriden by children classes to perform their init."""
+
     def ensure_access(self) -> None:
         """Raises an exception if access is expired."""
         if not self._access.valid():

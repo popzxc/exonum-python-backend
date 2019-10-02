@@ -40,6 +40,8 @@ class _WithSchemaMeta(type):
                 if dct["_schema_meta"].get(item) is None:
                     raise AttributeError(f"Item '{item}' is not a part of defined _schema_")
 
+                # TODO check that provided indices names are pointing to Proof*Index.
+
         new_class = super().__new__(cls, name, bases, dct)
         return new_class
 

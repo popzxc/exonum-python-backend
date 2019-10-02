@@ -23,6 +23,8 @@ class RawListIndexMethods(c.Structure):
         ("push", c.CFUNCTYPE(None, c.POINTER(RawListIndex), BinaryData)),
         ("pop", c.CFUNCTYPE(BinaryData, c.POINTER(RawListIndex), AllocateFunctype)),
         ("len", c.CFUNCTYPE(c.c_uint64, c.POINTER(RawListIndex))),
+        ("set_item", c.CFUNCTYPE(None, c.POINTER(RawListIndex), c.c_uint64, BinaryData)),
+        ("clear", c.CFUNCTYPE(None, c.POINTER(RawListIndex))),
     ]
 
 
@@ -73,3 +75,13 @@ class ListIndexWrapper:
         result = self._inner.methods.len(self._inner)
 
         return result.value
+
+    def set_item(self, idx: int, value: bytes) -> None:
+        """TODO"""
+        data = BinaryData(c.cast(value, c.POINTER(c.c_uint8)), c.c_uint64(len(value)))  # type: ignore
+
+        self._inner.methods.set(self._inner, c.c_uint64(idx), data)
+
+    def clear(self) -> None:
+        """TODO"""
+        self._inner.clear()
