@@ -2,7 +2,7 @@
 """Setup script for the Exonum python runtime."""
 from distutils.core import setup
 
-INSTALL_REQUIRES = ["protobuf", "pysodium", "tornado", "plyvel"]
+INSTALL_REQUIRES = ["protobuf", "pysodium", "tornado"]
 
 PYTHON_REQUIRES = ">=3.4"
 

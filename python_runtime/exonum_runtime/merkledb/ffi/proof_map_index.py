@@ -2,7 +2,7 @@
 from typing import Optional
 import ctypes as c
 
-from exonum_runtime.c_callbacks import allocate, free_resource
+from exonum_runtime.c_callbacks import merkledb_allocate
 from exonum_runtime.crypto import Hash
 from .common import BinaryData
 
@@ -41,16 +41,9 @@ class ProofMapIndexWrapper:
         """TODO"""
         # mypy isn't a friend of ctypes
         key = BinaryData(c.cast(key, c.POINTER(c.c_uint8)), c.c_uint64(len(key)))  # type: ignore
-        result = self._inner.methods.get(self._inner, key, allocate)
+        result = self._inner.methods.get(self._inner, key, merkledb_allocate)
 
-        if not result.data:
-            return None
-
-        data = result.data[: result.data.value]
-
-        free_resource(result.data)
-
-        return data
+        return result.into_bytes()
 
     def put(self, key: bytes, value: bytes) -> None:
         """TODO"""
@@ -73,10 +66,6 @@ class ProofMapIndexWrapper:
     def object_hash(self) -> Hash:
         """TODO"""
 
-        result = self._inner.methods.object_hash(self._inner, allocate)
+        result = self._inner.methods.object_hash(self._inner, merkledb_allocate)
 
-        data = result.data[: result.data.value]
-
-        free_resource(result.data)
-
-        return Hash(data)
+        return Hash(result.into_bytes())

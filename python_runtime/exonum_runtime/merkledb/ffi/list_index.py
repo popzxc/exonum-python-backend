@@ -2,7 +2,7 @@
 from typing import Optional
 import ctypes as c
 
-from exonum_runtime.c_callbacks import allocate, free_merkledb_allocated
+from exonum_runtime.c_callbacks import merkledb_allocate
 from .common import BinaryData
 
 # When working with C, it's always a compromise.
@@ -15,8 +15,6 @@ class RawListIndex(c.Structure):
 
 class RawListIndexMethods(c.Structure):
     """TODO"""
-
-    AllocateFunctype = c.CFUNCTYPE(c.POINTER(c.c_uint8), c.c_uint64)
 
     _fields_ = [
         ("get", c.CFUNCTYPE(BinaryData, c.POINTER(RawListIndex), c.c_uint64, c.c_void_p)),
@@ -39,16 +37,9 @@ class ListIndexWrapper:
 
     def get(self, idx: int) -> Optional[bytes]:
         """TODO"""
-        result = self._inner.methods.get(self._inner, c.c_uint64(idx), c.cast(allocate, c.c_void_p))
+        result = self._inner.methods.get(self._inner, c.c_uint64(idx), c.cast(merkledb_allocate, c.c_void_p))
 
-        if not result.data:
-            return None
-
-        data = result.data[: result.data_len]
-
-        free_merkledb_allocated()
-
-        return data
+        return result.into_bytes()
 
     def push(self, value: bytes) -> None:
         """TODO"""
@@ -59,16 +50,9 @@ class ListIndexWrapper:
 
     def pop(self) -> Optional[bytes]:
         """TODO"""
-        result = self._inner.methods.pop(self._inner, c.cast(allocate, c.c_void_p))
+        result = self._inner.methods.pop(self._inner, c.cast(merkledb_allocate, c.c_void_p))
 
-        if not result.data:
-            return None
-
-        data = result.data[: result.data.value]
-
-        free_merkledb_allocated()
-
-        return data
+        return result.into_bytes()
 
     def len(self) -> int:
         """TODO"""

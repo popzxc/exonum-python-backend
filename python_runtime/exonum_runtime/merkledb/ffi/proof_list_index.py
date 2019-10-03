@@ -2,7 +2,7 @@
 from typing import Optional
 import ctypes as c
 
-from exonum_runtime.c_callbacks import allocate, free_resource
+from exonum_runtime.c_callbacks import merkledb_allocate
 from exonum_runtime.crypto import Hash
 from .common import BinaryData
 
@@ -41,16 +41,9 @@ class ProofListIndexWrapper:
 
     def get(self, idx: int) -> Optional[bytes]:
         """TODO"""
-        result = self._inner.methods.get(self._inner, c.c_uint64(idx), allocate)
+        result = self._inner.methods.get(self._inner, c.c_uint64(idx), merkledb_allocate)
 
-        if not result.data:
-            return None
-
-        data = result.data[: result.data.value]
-
-        free_resource(result.data)
-
-        return data
+        return result.into_bytes()
 
     def push(self, value: bytes) -> None:
         """TODO"""
@@ -63,14 +56,7 @@ class ProofListIndexWrapper:
     #     """TODO"""
     #     result = self._inner.methods.pop(self._inner, allocate)
 
-    #     if not result.data:
-    #         return None
-
-    #     data = result.data[: result.data.value]
-
-    #     free_resource(result.data)
-
-    #     return data
+    #     return result.into_bytes()
 
     def len(self) -> int:
         """TODO"""
@@ -91,10 +77,6 @@ class ProofListIndexWrapper:
     def object_hash(self) -> Hash:
         """TODO"""
 
-        result = self._inner.methods.object_hash(self._inner, allocate)
+        result = self._inner.methods.object_hash(self._inner, merkledb_allocate)
 
-        data = result.data[: result.data.value]
-
-        free_resource(result.data)
-
-        return Hash(data)
+        return Hash(result.into_bytes())

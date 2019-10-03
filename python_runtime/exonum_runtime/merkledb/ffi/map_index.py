@@ -2,7 +2,7 @@
 from typing import Optional
 import ctypes as c
 
-from exonum_runtime.c_callbacks import allocate, free_resource
+from exonum_runtime.c_callbacks import merkledb_allocate
 from .common import BinaryData
 
 # When working with C, it's always a compromise.
@@ -16,10 +16,8 @@ class RawMapIndex(c.Structure):
 class RawMapIndexMethods(c.Structure):
     """TODO"""
 
-    AllocateFunctype = c.CFUNCTYPE(c.POINTER(c.c_uint8), c.c_uint64)
-
     _fields_ = [
-        ("get", c.CFUNCTYPE(BinaryData, c.POINTER(RawMapIndex), BinaryData, AllocateFunctype)),
+        ("get", c.CFUNCTYPE(BinaryData, c.POINTER(RawMapIndex), BinaryData, c.c_void_p)),
         ("put", c.CFUNCTYPE(None, c.POINTER(RawMapIndex), BinaryData, BinaryData)),
         ("remove", c.CFUNCTYPE(None, c.POINTER(RawMapIndex), BinaryData)),
         ("clear", c.CFUNCTYPE(c.c_uint64, c.POINTER(RawMapIndex))),
@@ -39,16 +37,9 @@ class MapIndexWrapper:
         """TODO"""
         # mypy isn't a friend of ctypes
         key = BinaryData(c.cast(key, c.POINTER(c.c_uint8)), c.c_uint64(len(key)))  # type: ignore
-        result = self._inner.methods.get(self._inner, key, allocate)
+        result = self._inner.methods.get(self._inner, key, c.cast(merkledb_allocate, c.c_void_p))
 
-        if not result.data:
-            return None
-
-        data = result.data[: result.data.value]
-
-        free_resource(result.data)
-
-        return data
+        return result.into_bytes()
 
     def put(self, key: bytes, value: bytes) -> None:
         """TODO"""
