@@ -37,10 +37,7 @@ class RustFFIProvider:
         self._rust_interface.init_python_side.argtypes = [c.POINTER(RawPythonMethods)]
         self._rust_interface.deployment_completed.argtypes = [RawArtifactId, c.c_uint32]
 
-        # Init rust side.
-        self._init_rust()
-
-    def _init_rust(self) -> None:
+    def init_rust(self) -> None:
         """Initializes Python interfaces in the Rust side."""
         self._rust_interface.init_python_side(c.byref(self._ffi_callbacks))
 

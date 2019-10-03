@@ -96,20 +96,13 @@ impl Default for PythonMethods {
     }
 }
 
-use exonum_merkledb::{Database, TemporaryDB};
-
 /// Initialize python interfaces.
 /// This function is meant to be called by the python side during the initialization.
 #[no_mangle]
 pub unsafe extern "C" fn init_python_side(methods: *const PythonMethods) {
     let mut python_interface = PYTHON_INTERFACE.write().expect("Excepted write");
 
-    let db = TemporaryDB::default();
-    let fork = db.fork();
-
     (*python_interface).methods = *methods;
-
-    ((*python_interface).methods.after_commit)(&fork as *const Fork);
 }
 
 /// Removes an artifact from the pending deployments.

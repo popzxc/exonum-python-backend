@@ -1,8 +1,12 @@
 """TODO"""
 
-from typing import Tuple, Dict, Any, List
+from typing import Tuple, Dict, Any, List, Type
 
+from exonum_runtime.interfaces import Named
 from .indices.base_index import BaseIndex
+from .indices import ProofListIndex, ProofMapIndex
+
+# Should be removed I guess?
 
 
 class _WithSchemaMeta(type):
@@ -21,6 +25,10 @@ class _WithSchemaMeta(type):
         if WithSchema not in bases:
             raise TypeError("Classes with schema should be derived from WithSchema class")
 
+        # Check that class is subclass of Named.
+        if Named not in bases:
+            raise TypeError("Classes with schema should be subclasses of `Named` class")
+
         # Check that _schema_ attribute is set.
         schema = dct.get("_schema_")
         if schema is None or not issubclass(schema, Schema):
@@ -37,10 +45,14 @@ class _WithSchemaMeta(type):
                     raise AttributeError("_state_hash_ attribute must be a list of strings")
 
                 # Indices from _state_hash_ should be names from _schema_
-                if dct["_schema_meta"].get(item) is None:
+                if getattr(schema, "_schema_meta").get(item) is None:
                     raise AttributeError(f"Item '{item}' is not a part of defined _schema_")
 
-                # TODO check that provided indices names are pointing to Proof*Index.
+                if getattr(schema, "_schema_meta")[item] not in (ProofListIndex, ProofMapIndex):
+                    raise AttributeError(f"Item '{item}' is not a Proof*Index")
+
+        if "__getattr__" in dct:
+            raise AttributeError("Classes derived from `WithSchema` should not implement __getattr__")
 
         new_class = super().__new__(cls, name, bases, dct)
         return new_class
@@ -67,7 +79,8 @@ class WithSchema(metaclass=_WithSchemaMeta):
 
     >>> _state_hash_ = ["wallets"]
 
-    Please note that provided names should persist in schema passed to the _schema_ attribute.
+    Please note that provided names should persist in schema passed to the _schema_ attribute
+    and point to `Proof*Index` type.
     """
 
     _schema_ = None

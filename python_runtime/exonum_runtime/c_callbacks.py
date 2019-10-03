@@ -1,6 +1,6 @@
 """C callbacks to be provided to Rust"""
 
-from typing import Set
+from typing import Set, List, Any
 import ctypes as c
 
 from .raw_types import (
@@ -17,7 +17,9 @@ from .ffi import RustFFIProvider
 # Dynamically allocated resources
 #
 # Resources are freed by the rust through a `free` method call.
-RESOURCES: Set[c.c_void_p] = set()
+_RESOURCES: Set[c.c_void_p] = set()
+# Resources allocated by the merkledb.
+_MERKLEDB_ALLOCATED: List[Any] = list()
 
 
 @c.CFUNCTYPE(c.c_bool, RawArtifactId, c.POINTER(c.c_ubyte), c.c_uint64)
@@ -105,7 +107,7 @@ def state_hashes(state_hash_aggregator):  # type: ignore # Signature is one line
     raw_state_hashes = RawStateHashAggregator.from_state_hash_aggregator(hashes)
     raw_state_hashes_ptr = c.pointer(raw_state_hashes)
 
-    RESOURCES.add(c.cast(raw_state_hashes_ptr, c.c_void_p))
+    _RESOURCES.add(c.cast(raw_state_hashes_ptr, c.c_void_p))
 
     state_hash_aggregator.content = raw_state_hashes_ptr
 
@@ -123,7 +125,7 @@ def artifact_protobuf_spec(raw_artifact_id, spec):  # type: ignore # Signature i
         raw_spec = RawArtifactProtobufSpec.from_artifact_protobuf_spec(spec)
         raw_spec_ptr = c.pointer(raw_spec)
 
-        RESOURCES.add(c.cast(raw_spec_ptr, c.c_void_p))
+        _RESOURCES.add(c.cast(raw_spec_ptr, c.c_void_p))
     else:
         raw_spec_ptr = None
 
@@ -138,6 +140,16 @@ def before_commit():  # type: ignore # Signature is one line above.
     ffi.runtime().before_commit()
 
 
+@c.CFUNCTYPE(c.c_void_p, c.c_uint64)
+def merkledb_allocate(length: int):  # type: ignore # Signature is one line above.
+    """Request for memory allocation."""
+    data = (c.c_uint8 * length)(*([0] * length))
+
+    _MERKLEDB_ALLOCATED.append(data)
+
+    return c.addressof(data)
+
+
 @c.CFUNCTYPE(None, c.c_void_p)
 def after_commit(_fork):  # type: ignore # Signature is one line above.
     """After commit callback."""
@@ -147,22 +159,17 @@ def after_commit(_fork):  # type: ignore # Signature is one line above.
     ffi.runtime().after_commit()
 
 
-@c.CFUNCTYPE(c.c_void_p, c.c_uint64)
-def allocate(length: u64):  # type: ignore # Signature is one line above.
-    """Request for memory allocation."""
-    data = c.c_uint8 * length
-
-    raw_data_ptr = c.cast(data, c.c_void_p)
-    RESOURCES.add(raw_data_ptr)
-
-    return raw_data_ptr
-
-
 @c.CFUNCTYPE(None, c.c_void_p)
 def free_resource(resource):  # type: ignore # Signature is one line above.
     """Callback called when resource is consumed and can be freed."""
 
-    RESOURCES.remove(resource)
+    # TODO probably not work
+    _RESOURCES.remove(resource)
+
+
+def free_merkledb_allocated() -> None:
+    """Free memory allocated by merkledb bindings."""
+    _MERKLEDB_ALLOCATED.pop()
 
 
 def build_callbacks() -> RawPythonMethods:

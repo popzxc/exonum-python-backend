@@ -23,6 +23,7 @@ from .crypto import KeyPair
 from .ffi import RustFFIProvider
 from .proto.protobuf import PythonArtifactSpec, ParseError
 from .runtime_api import RuntimeApi
+from .merkledb.ffi.ffi import MerkledbFFI
 
 
 class Instance:
@@ -40,6 +41,7 @@ class PythonRuntime(RuntimeInterface):
         self._loop = loop
         self._configuration = Configuration(config_path)
         self._rust_ffi = RustFFIProvider(self._configuration.rust_lib_path, self, build_callbacks())
+        self._merkledb_ffi = MerkledbFFI(self._rust_ffi._rust_interface)
         self._pending_deployments: Dict[ArtifactId, Artifact] = {}
         self._artifacts: Dict[ArtifactId, Artifact] = {}
         self._instances: Dict[InstanceSpec, Instance] = {}
@@ -47,6 +49,9 @@ class PythonRuntime(RuntimeInterface):
         self._runtime_api = RuntimeApi(port=8080)
 
         self._init_artifacts()
+
+        # Now we're ready to go, init python side.
+        self._rust_ffi.init_rust()
 
     def _init_artifacts(self) -> None:
         # Create artifacts sources folder if needed.

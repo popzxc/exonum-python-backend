@@ -2,7 +2,7 @@
 from typing import Optional
 import ctypes as c
 
-from exonum_runtime.c_callbacks import allocate, free_resource
+from exonum_runtime.c_callbacks import allocate, free_merkledb_allocated
 from .common import BinaryData
 
 # When working with C, it's always a compromise.
@@ -19,9 +19,9 @@ class RawListIndexMethods(c.Structure):
     AllocateFunctype = c.CFUNCTYPE(c.POINTER(c.c_uint8), c.c_uint64)
 
     _fields_ = [
-        ("get", c.CFUNCTYPE(BinaryData, c.POINTER(RawListIndex), c.c_uint64, AllocateFunctype)),
+        ("get", c.CFUNCTYPE(BinaryData, c.POINTER(RawListIndex), c.c_uint64, c.c_void_p)),
         ("push", c.CFUNCTYPE(None, c.POINTER(RawListIndex), BinaryData)),
-        ("pop", c.CFUNCTYPE(BinaryData, c.POINTER(RawListIndex), AllocateFunctype)),
+        ("pop", c.CFUNCTYPE(BinaryData, c.POINTER(RawListIndex), c.c_void_p)),
         ("len", c.CFUNCTYPE(c.c_uint64, c.POINTER(RawListIndex))),
         ("set_item", c.CFUNCTYPE(None, c.POINTER(RawListIndex), c.c_uint64, BinaryData)),
         ("clear", c.CFUNCTYPE(None, c.POINTER(RawListIndex))),
@@ -39,14 +39,14 @@ class ListIndexWrapper:
 
     def get(self, idx: int) -> Optional[bytes]:
         """TODO"""
-        result = self._inner.methods.get(self._inner, c.c_uint64(idx), allocate)
+        result = self._inner.methods.get(self._inner, c.c_uint64(idx), c.cast(allocate, c.c_void_p))
 
         if not result.data:
             return None
 
-        data = result.data[: result.data.value]
+        data = result.data[: result.data_len]
 
-        free_resource(result.data)
+        free_merkledb_allocated()
 
         return data
 
@@ -59,14 +59,14 @@ class ListIndexWrapper:
 
     def pop(self) -> Optional[bytes]:
         """TODO"""
-        result = self._inner.methods.pop(self._inner, allocate)
+        result = self._inner.methods.pop(self._inner, c.cast(allocate, c.c_void_p))
 
         if not result.data:
             return None
 
         data = result.data[: result.data.value]
 
-        free_resource(result.data)
+        free_merkledb_allocated()
 
         return data
 
@@ -74,7 +74,7 @@ class ListIndexWrapper:
         """TODO"""
         result = self._inner.methods.len(self._inner)
 
-        return result.value
+        return int(result)
 
     def set_item(self, idx: int, value: bytes) -> None:
         """TODO"""
@@ -84,4 +84,4 @@ class ListIndexWrapper:
 
     def clear(self) -> None:
         """TODO"""
-        self._inner.clear()
+        self._inner.methods.clear(self._inner)

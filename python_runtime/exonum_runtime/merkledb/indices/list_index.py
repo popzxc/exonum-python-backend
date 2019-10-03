@@ -59,4 +59,6 @@ class _ListIndexIter:
         if value is None:
             raise RuntimeError("Index size changed during iteration")
 
+        self._pos += 1
+
         return value
