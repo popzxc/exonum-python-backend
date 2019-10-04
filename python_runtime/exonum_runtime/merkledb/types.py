@@ -7,6 +7,7 @@ from typing import Optional, Any
 class Access:
     """A generic access to the database."""
 
+    # TODO do not store c.c_void_p here.
     def __init__(self, inner: c.c_void_p):
         self._inner = inner
         self._valid = False

@@ -3,8 +3,8 @@
 from typing import Optional
 
 from exonum_runtime.crypto import Hash
+from exonum_runtime.ffi.merkledb import MerkledbFFI, ProofListIndexWrapper
 from .base_index import BaseIndex
-from ..ffi import MerkledbFFI, ProofListIndexWrapper
 
 
 class ProofListIndex(BaseIndex):
@@ -14,7 +14,7 @@ class ProofListIndex(BaseIndex):
         """Initializes the ProofListIndex internal structure."""
         # pylint: disable=attribute-defined-outside-init
         ffi = MerkledbFFI.instance()
-        self._index = ffi.proof_list_index(self._index_id, self._access)
+        self._index = ffi.proof_list_index(self._index_id, self._access.inner())
 
     def __iter__(self) -> "_ProofListIndexIter":
         return _ProofListIndexIter(self._index)

@@ -2,46 +2,42 @@
 from typing import Optional
 import ctypes as c
 
-from exonum_runtime.c_callbacks import merkledb_allocate
-from exonum_runtime.crypto import Hash
+from exonum_runtime.ffi.c_callbacks import merkledb_allocate
 from .common import BinaryData
 
 # When working with C, it's always a compromise.
 # pylint: disable=protected-access
 
 
-class RawProofMapIndex(c.Structure):
+class RawMapIndex(c.Structure):
     """TODO"""
 
 
-class RawProofMapIndexMethods(c.Structure):
+class RawMapIndexMethods(c.Structure):
     """TODO"""
-
-    AllocateFunctype = c.CFUNCTYPE(c.POINTER(c.c_uint8), c.c_uint64)
 
     _fields_ = [
-        ("get", c.CFUNCTYPE(BinaryData, c.POINTER(RawProofMapIndex), BinaryData, AllocateFunctype)),
-        ("put", c.CFUNCTYPE(None, c.POINTER(RawProofMapIndex), BinaryData, BinaryData)),
-        ("remove", c.CFUNCTYPE(None, c.POINTER(RawProofMapIndex), BinaryData)),
-        ("clear", c.CFUNCTYPE(c.c_uint64, c.POINTER(RawProofMapIndex))),
-        ("object_hash", c.CFUNCTYPE(BinaryData, c.POINTER(RawProofMapIndex), AllocateFunctype)),
+        ("get", c.CFUNCTYPE(BinaryData, c.POINTER(RawMapIndex), BinaryData, c.c_void_p)),
+        ("put", c.CFUNCTYPE(None, c.POINTER(RawMapIndex), BinaryData, BinaryData)),
+        ("remove", c.CFUNCTYPE(None, c.POINTER(RawMapIndex), BinaryData)),
+        ("clear", c.CFUNCTYPE(c.c_uint64, c.POINTER(RawMapIndex))),
     ]
 
 
-RawProofMapIndex._fields_ = [("fork", c.c_void_p), ("index_name", c.c_char_p), ("methods", RawProofMapIndexMethods)]
+RawMapIndex._fields_ = [("fork", c.c_void_p), ("index_name", c.c_char_p), ("methods", RawMapIndexMethods)]
 
 
-class ProofMapIndexWrapper:
+class MapIndexWrapper:
     """TODO"""
 
-    def __init__(self, inner: RawProofMapIndex) -> None:
+    def __init__(self, inner: RawMapIndex) -> None:
         self._inner = inner
 
     def get(self, key: bytes) -> Optional[bytes]:
         """TODO"""
         # mypy isn't a friend of ctypes
         key = BinaryData(c.cast(key, c.POINTER(c.c_uint8)), c.c_uint64(len(key)))  # type: ignore
-        result = self._inner.methods.get(self._inner, key, merkledb_allocate)
+        result = self._inner.methods.get(self._inner, key, c.cast(merkledb_allocate, c.c_void_p))
 
         return result.into_bytes()
 
@@ -62,10 +58,3 @@ class ProofMapIndexWrapper:
     def clear(self) -> None:
         """TODO"""
         self._inner.methods.clear(self._inner)
-
-    def object_hash(self) -> Hash:
-        """TODO"""
-
-        result = self._inner.methods.object_hash(self._inner, merkledb_allocate)
-
-        return Hash(result.into_bytes())

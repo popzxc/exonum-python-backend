@@ -2,7 +2,6 @@
 from typing import Any
 import ctypes as c
 
-from ..types import Access
 from .list_index import RawListIndex, ListIndexWrapper
 from .map_index import RawMapIndex, MapIndexWrapper
 from .proof_list_index import RawProofListIndex, ProofListIndexWrapper
@@ -47,34 +46,34 @@ class MerkledbFFI:
         self._rust_interface.merkledb_proof_map_index.argtypes = [c.c_void_p, c.c_char_p]
         self._rust_interface.merkledb_proof_map_index.restype = RawProofMapIndex
 
-    def list_index(self, name: bytes, access: Access) -> ListIndexWrapper:
+    def list_index(self, name: bytes, fork: c.c_void_p) -> ListIndexWrapper:
         """Constructs ListIndex"""
         constructor = self._rust_interface.merkledb_list_index
 
-        raw_list_index = constructor(access._inner, c.c_char_p(name))
+        raw_list_index = constructor(fork, c.c_char_p(name))
 
         return ListIndexWrapper(raw_list_index)
 
-    def map_index(self, name: bytes, access: Access) -> MapIndexWrapper:
+    def map_index(self, name: bytes, fork: c.c_void_p) -> MapIndexWrapper:
         """Constructs MapIndex"""
         constructor = self._rust_interface.merkledb_map_index
 
-        raw_map_index = constructor(access._inner, c.c_char_p(name))
+        raw_map_index = constructor(fork, c.c_char_p(name))
 
         return MapIndexWrapper(raw_map_index)
 
-    def proof_list_index(self, name: bytes, access: Access) -> ProofListIndexWrapper:
+    def proof_list_index(self, name: bytes, fork: c.c_void_p) -> ProofListIndexWrapper:
         """Constructs ProofListIndex"""
         constructor = self._rust_interface.merkledb_proof_list_index
 
-        raw_list_index = constructor(access._inner, c.c_char_p(name))
+        raw_list_index = constructor(fork, c.c_char_p(name))
 
         return ProofListIndexWrapper(raw_list_index)
 
-    def proof_map_index(self, name: bytes, access: Access) -> ProofMapIndexWrapper:
+    def proof_map_index(self, name: bytes, fork: c.c_void_p) -> ProofMapIndexWrapper:
         """Constructs ProofMapIndex"""
         constructor = self._rust_interface.merkledb_proof_map_index
 
-        raw_map_index = constructor(access._inner, c.c_char_p(name))
+        raw_map_index = constructor(fork, c.c_char_p(name))
 
         return ProofMapIndexWrapper(raw_map_index)

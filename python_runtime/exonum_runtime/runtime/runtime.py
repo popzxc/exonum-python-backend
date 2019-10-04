@@ -5,6 +5,12 @@ from typing import Dict, Optional
 import os
 import sys
 
+from exonum_runtime.crypto import KeyPair
+from exonum_runtime.ffi.c_callbacks import build_callbacks
+from exonum_runtime.ffi.ffi_provider import RustFFIProvider
+from exonum_runtime.ffi.merkledb import MerkledbFFI
+from exonum_runtime.proto import PythonArtifactSpec, ParseError
+
 from .artifact import Artifact
 from .types import (
     RuntimeInterface,
@@ -17,13 +23,8 @@ from .types import (
     StateHashAggregator,
     ArtifactProtobufSpec,
 )
-from .c_callbacks import build_callbacks
 from .config import Configuration
-from .crypto import KeyPair
-from .ffi import RustFFIProvider
-from .proto.protobuf import PythonArtifactSpec, ParseError
 from .runtime_api import RuntimeApi
-from .merkledb.ffi.ffi import MerkledbFFI
 
 
 class Instance:

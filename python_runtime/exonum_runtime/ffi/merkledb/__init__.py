@@ -1,4 +1,4 @@
-"""TODO"""
+"""Merkledb FFI module"""
 from .ffi import MerkledbFFI
 from .list_index import ListIndexWrapper
 from .map_index import MapIndexWrapper

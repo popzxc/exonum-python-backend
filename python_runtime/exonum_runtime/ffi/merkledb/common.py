@@ -2,7 +2,7 @@
 from typing import Optional
 import ctypes as c
 
-from exonum_runtime.c_callbacks import free_merkledb_allocated
+from exonum_runtime.ffi.c_callbacks import free_merkledb_allocated
 
 
 class BinaryData(c.Structure):

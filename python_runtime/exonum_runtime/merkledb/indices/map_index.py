@@ -2,8 +2,8 @@
 
 from typing import Optional
 
+from exonum_runtime.ffi.merkledb import MerkledbFFI
 from .base_index import BaseIndex
-from ..ffi import MerkledbFFI
 
 
 class MapIndex(BaseIndex):
@@ -13,7 +13,7 @@ class MapIndex(BaseIndex):
         """Initializes the MapIndex internal structure."""
         # pylint: disable=attribute-defined-outside-init
         ffi = MerkledbFFI.instance()
-        self._index = ffi.map_index(self._index_id, self._access)
+        self._index = ffi.map_index(self._index_id, self._access.inner())
 
     # TODO iteration is not yet supported
     # def __iter__(self) -> "_MapIndexIter":

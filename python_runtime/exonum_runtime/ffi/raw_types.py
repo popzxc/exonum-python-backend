@@ -3,8 +3,15 @@
 from typing import List, Tuple, Any
 import ctypes as c
 
-from .types import ArtifactId, InstanceSpec, StateHashAggregator, ArtifactProtobufSpec, InstanceDescriptor, CallInfo
-from .crypto import Hash
+from exonum_runtime.types import (
+    ArtifactId,
+    InstanceSpec,
+    StateHashAggregator,
+    ArtifactProtobufSpec,
+    InstanceDescriptor,
+    CallInfo,
+)
+from exonum_runtime.crypto import Hash
 
 
 class RawPythonMethods(c.Structure):

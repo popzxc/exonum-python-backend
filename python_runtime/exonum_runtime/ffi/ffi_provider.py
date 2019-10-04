@@ -2,7 +2,7 @@
 from typing import Any
 import ctypes as c
 
-from .types import RuntimeInterface, DeploymentResult
+from exonum_runtime.types import RuntimeInterface, DeploymentResult
 from .raw_types import RawPythonMethods, RawArtifactId
 
 

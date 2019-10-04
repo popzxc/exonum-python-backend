@@ -2,9 +2,9 @@
 
 from typing import Optional
 
+from exonum_runtime.ffi.merkledb import MerkledbFFI
 from exonum_runtime.crypto import Hash
 from .base_index import BaseIndex
-from ..ffi import MerkledbFFI
 
 
 class ProofMapIndex(BaseIndex):
@@ -14,7 +14,7 @@ class ProofMapIndex(BaseIndex):
         """Initializes the ProofMapIndex internal structure."""
         # pylint: disable=attribute-defined-outside-init
         ffi = MerkledbFFI.instance()
-        self._index = ffi.proof_map_index(self._index_id, self._access)
+        self._index = ffi.proof_map_index(self._index_id, self._access.inner())
 
     # TODO iteration is not yet supported
     # def __iter__(self) -> "_ProofMapIndexIter":

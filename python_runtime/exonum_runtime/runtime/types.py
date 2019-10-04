@@ -3,7 +3,7 @@ from typing import NamedTuple, NewType, Tuple, List, Optional
 from enum import IntEnum
 import abc
 
-from .crypto import Hash, KeyPair
+from exonum_runtime.crypto import Hash, KeyPair
 
 
 class PythonRuntimeResult(IntEnum):

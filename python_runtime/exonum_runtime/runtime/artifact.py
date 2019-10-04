@@ -5,9 +5,10 @@ import os
 import sys
 import importlib
 
+from exonum_runtime.proto import PythonArtifactSpec
+
 from .types import ArtifactId, DeploymentResult, PythonRuntimeResult
 from .config import Configuration
-from .proto.protobuf import PythonArtifactSpec
 from .service import Service
 
 

@@ -2,7 +2,7 @@
 from typing import Optional
 import ctypes as c
 
-from exonum_runtime.c_callbacks import merkledb_allocate
+from exonum_runtime.ffi.c_callbacks import merkledb_allocate
 from .common import BinaryData
 
 # When working with C, it's always a compromise.

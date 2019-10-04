@@ -2,7 +2,7 @@
 import abc
 from typing import List
 
-from .crypto import Hash
+from exonum_runtime.crypto import Hash
 
 
 class ServiceError(Exception):

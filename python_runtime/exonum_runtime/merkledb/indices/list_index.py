@@ -2,8 +2,8 @@
 
 from typing import Optional
 
+from exonum_runtime.ffi.merkledb import MerkledbFFI, ListIndexWrapper
 from .base_index import BaseIndex
-from ..ffi import MerkledbFFI, ListIndexWrapper
 
 
 class ListIndex(BaseIndex):
@@ -13,7 +13,7 @@ class ListIndex(BaseIndex):
         """Initializes the ListIndex internal structure."""
         # pylint: disable=attribute-defined-outside-init
         ffi = MerkledbFFI.instance()
-        self._index = ffi.list_index(self._index_id, self._access)
+        self._index = ffi.list_index(self._index_id, self._access.inner())
 
     def __iter__(self) -> "_ListIndexIter":
         return _ListIndexIter(self._index)
