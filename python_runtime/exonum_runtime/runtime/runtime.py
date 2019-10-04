@@ -5,11 +5,14 @@ from typing import Dict, Optional
 import os
 import sys
 
-from exonum_runtime.crypto import KeyPair
 from exonum_runtime.ffi.c_callbacks import build_callbacks
 from exonum_runtime.ffi.ffi_provider import RustFFIProvider
 from exonum_runtime.ffi.merkledb import MerkledbFFI
 from exonum_runtime.proto import PythonArtifactSpec, ParseError
+from exonum_runtime.interfaces import Named
+
+from exonum_runtime.merkledb.schema import Schema, WithSchema
+from exonum_runtime.merkledb.indices import ProofMapIndex
 
 from .artifact import Artifact
 from .types import (
@@ -37,8 +40,17 @@ class Instance:
         self._artifact = instance_spec.artifact
 
 
-class PythonRuntime(RuntimeInterface):
+class PythonRuntimeSchema(Schema):
+    """Python runtime schema"""
+
+    services: ProofMapIndex
+
+
+class PythonRuntime(RuntimeInterface, Named, WithSchema):
     """TODO"""
+
+    _schema_ = PythonRuntimeSchema
+    _state_hash_ = ["services"]
 
     def __init__(self, loop: asyncio.AbstractEventLoop, config_path: str) -> None:
         self._loop = loop
@@ -49,6 +61,7 @@ class PythonRuntime(RuntimeInterface):
         self._artifacts: Dict[ArtifactId, Artifact] = {}
         self._instances: Dict[InstanceSpec, Instance] = {}
 
+        # TODO
         self._runtime_api = RuntimeApi(port=8080)
 
         self._init_artifacts()
@@ -83,6 +96,11 @@ class PythonRuntime(RuntimeInterface):
 
         # Service is removed from pending deployments no matter how deployment ended.
         del self._pending_deployments[result.artifact_id]
+
+    # Implementation of Named.
+
+    def instance_name(self) -> str:
+        return "python_runtime"
 
     # Implementation of RuntimeInterface.
 

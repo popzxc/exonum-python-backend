@@ -1,15 +1,15 @@
 """TODO"""
 
-from typing import Tuple, Dict, Any, List
+import abc
+from typing import Tuple, Dict, Any, List, Optional, Type
 
 from exonum_runtime.interfaces import Named
 from .indices.base_index import BaseIndex
 from .indices import ProofListIndex, ProofMapIndex
+from .types import Access
 
-# Should be removed I guess?
 
-
-class _WithSchemaMeta(type):
+class _WithSchemaMeta(abc.ABCMeta):
     """Metaclass for objects that do have schema.
 
     It parses _schema_ and _state_hash_ attributes of the class
@@ -83,14 +83,14 @@ class WithSchema(metaclass=_WithSchemaMeta):
     and point to `Proof*Index` type.
     """
 
-    _schema_ = None
-    _state_hash_ = None
+    _schema_: Optional[Type["Schema"]] = None
+    _state_hash_: Optional[List[str]] = None
 
     def _get_indices(self) -> List[str]:
         return getattr(self, "_schema_meta").values()
 
 
-class _SchemaMeta(type):
+class _SchemaMeta(abc.ABCMeta):
     """Metaclass for Schema class.
 
     It parses type annotations defined in the class body
@@ -113,7 +113,7 @@ class _SchemaMeta(type):
 
         dct["_schema_meta"] = dict()
 
-        for index_name, index_type in annotations:
+        for index_name, index_type in annotations.items():
             if not issubclass(index_type, BaseIndex):
                 raise AttributeError(f"Incorrect index type: {index_type}")
 
@@ -152,3 +152,21 @@ class Schema(metaclass=_SchemaMeta):
         """Returns the type of the index with provided name."""
 
         return getattr(cls, "_schema_meta")[index_name]
+
+    def __init__(self, owner: Named, access: Access):
+        self._access = access
+        self._owner = owner
+
+    def __getattribute__(self, name: str) -> Any:
+        schema_meta = super().__getattribute__("_schema_meta")
+        if name in schema_meta:
+            # If we're accessing the name assotiated with index,
+            # create an object of that index and return it.
+            index_type = schema_meta[name]
+
+            instance_name = self._owner.instance_name()
+            index_name = name
+
+            return index_type(self._access, instance_name, index_name)
+
+        return super().__getattribute__(name)

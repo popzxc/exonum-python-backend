@@ -29,22 +29,50 @@ class _BaseIndexMeta(type):
 
 
 class BaseIndex(metaclass=_BaseIndexMeta):
-    """Base interface to the database for indices."""
+    """Base interface to the database for indices.
 
-    def __init__(self, access: Access, instance_name: str, index_name: str, family: Optional[str]):
+    Example of usage:
+
+    >>> some_index_generic = SomeIndex(access, "instance", "index")
+    >>> some_index = some_index_generic("family_123")
+    >>> some_index.concrete_index_operation()
+
+    That may look a bit complicated (why call the index twice?), but this is required
+    to make `Schema` class comfortable.
+    """
+
+    def __init__(self, access: Access, instance_name: str, index_name: str):
         self._access = access
+        self._instance_name = instance_name
+        self._index_name = index_name
+        self._index_id = b""
+
+        self._initialized = False
+
+    def __call__(self, family: Optional[str]) -> "BaseIndex":
+        """Initializes the index and sets the index family if provided."""
         if family is None:
-            self._index_id = bytes(f"{instance_name}.{index_name}", "utf-8")
+            self._index_id = bytes(f"{self._instance_name}.{self._index_name}", "utf-8")
         else:
-            self._index_id = bytes(f"{instance_name}.{index_name}.{family}", "utf-8")
+            self._index_id = bytes(f"{self._instance_name}.{self._index_name}.{family}", "utf-8")
 
         self.initialize()
+
+        self._initialized = True
+
+        return self
 
     def initialize(self) -> None:
         """Method to be overriden by children classes to perform their init."""
 
     def ensure_access(self) -> None:
-        """Raises an exception if access is expired."""
+        """Raises an exception if access is expired or attempted to access
+        not initialized index."""
+        if not self._initialized:
+            raise IndexAccessError(
+                "Service is initialized. See the `BaseIndex` docs to check if you're creating objects correctly"
+            )
+
         if not self._access.valid():
             raise IndexAccessError("Access to index expired")
 
