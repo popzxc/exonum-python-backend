@@ -10,11 +10,20 @@ from exonum_runtime.runtime.types import (
     ArtifactProtobufSpec,
     InstanceDescriptor,
     CallInfo,
+    CallerService,
+    CallerTransaction,
+    Caller,
+    ExecutionContext,
+    InstanceId,
 )
-from exonum_runtime.crypto import Hash
+from exonum_runtime.crypto import Hash, PublicKey
+
+RawIndexAccess = c.c_void_p
 
 
 class RawPythonMethods(c.Structure):
+    """TODO"""
+
     _fields_ = [
         ("deploy_artifact", c.c_void_p),
         ("is_artifact_deployed", c.c_void_p),
@@ -186,3 +195,44 @@ class RawArtifactProtobufSpec(c.Structure):
         raw_files = (RawProtoSourceFile * len(spec.sources))(*list(files_iter))
 
         return cls(files=raw_files, files_amount=len(spec.sources))
+
+
+class RawCaller(c.Structure):
+    """C representation of Caller."""
+
+    _fields_ = [
+        ("tx_type", c.c_uint32),
+        ("hash", c.POINTER(c.c_uint8)),
+        ("author", c.POINTER(c.c_uint8)),
+        ("instance_id", c.c_uint32),
+    ]
+
+    def into_caller(self) -> Caller:
+        """TODO"""
+        if self.tx_type == 0:
+            # Caller is transaction.
+            hash_bytes = bytes(self.hash[:32])
+            pk_bytes = bytes(self.author[:32])
+            caller_tx = CallerTransaction(tx_hash=Hash(hash_bytes), author=PublicKey(pk_bytes))
+            return Caller(caller_tx)
+
+        if self.tx_type == 1:
+            # Caller is service.
+            caller_service = CallerService(instance_id=InstanceId(int(self.instance_id)))
+            return Caller(caller_service)
+
+        raise RuntimeError(f"Received unknown caller type: {self.tx_type}")
+
+
+class RawExecutionContext(c.Structure):
+    """C representation of ExecutionContext."""
+
+    _fields_ = [("access", RawIndexAccess), ("caller", RawCaller), ("interface_name", c.c_char_p)]
+
+    def into_execution_context(self) -> ExecutionContext:
+        """TODO"""
+
+        access = self.access
+        caller = self.caller.into_caller()
+        interface_name = str(c.string_at(self.interface_name), "utf-8")
+        return ExecutionContext(access, caller, interface_name)

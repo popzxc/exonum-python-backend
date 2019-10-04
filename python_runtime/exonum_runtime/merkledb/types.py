@@ -1,14 +1,14 @@
 """TODO"""
 
-import ctypes as c
 from typing import Optional, Any
+
+from exonum_runtime.ffi.raw_types import RawIndexAccess
 
 
 class Access:
     """A generic access to the database."""
 
-    # TODO do not store c.c_void_p here.
-    def __init__(self, inner: c.c_void_p):
+    def __init__(self, inner: RawIndexAccess):
         self._inner = inner
         self._valid = False
 
@@ -24,7 +24,7 @@ class Access:
         """Returns True if access is valid and can be used."""
         return self._valid
 
-    def inner(self) -> c.c_void_p:
+    def inner(self) -> RawIndexAccess:
         """Returns the inner access pointer."""
         if not self.valid():
             raise RuntimeError("Access is not valid anymore")

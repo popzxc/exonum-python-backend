@@ -1,9 +1,13 @@
 """Common types for python runtime."""
-from typing import NamedTuple, NewType, Tuple, List, Optional
+from typing import NamedTuple, NewType, Tuple, List, Union
 from enum import IntEnum
-import abc
 
-from exonum_runtime.crypto import Hash, KeyPair
+import ctypes as c
+
+from exonum_runtime.crypto import Hash, PublicKey
+
+# TODO: Redeclaration to avoid cyclic import (raw_types -> types -> raw_types).
+RawIndexAccess = c.c_void_p
 
 
 class PythonRuntimeResult(IntEnum):
@@ -82,45 +86,28 @@ class StateHashAggregator(NamedTuple):
     instances: List[Tuple[InstanceId, List[Hash]]]
 
 
-class RuntimeInterface(metaclass=abc.ABCMeta):
-    """Interface of the runtime."""
+class CallerTransaction(NamedTuple):
+    """TODO"""
 
-    @abc.abstractmethod
-    def request_deploy(self, artifact_id: ArtifactId, artifact_spec: bytes) -> PythonRuntimeResult:
-        """Requests deploy of the artifact."""
+    tx_hash: Hash
+    author: PublicKey
 
-    @abc.abstractmethod
-    def is_artifact_deployed(self, artifact_id: ArtifactId) -> bool:
-        """Returns True if artifact is deployed and false otherwise."""
 
-    @abc.abstractmethod
-    def start_instance(self, instance_spec: InstanceSpec) -> PythonRuntimeResult:
-        """Starts the instance with the provided name."""
+class CallerService(NamedTuple):
+    """TODO"""
 
-    @abc.abstractmethod
-    def initialize_service(self, instance: InstanceDescriptor, parameters: bytes) -> PythonRuntimeResult:
-        """Initialize the instance."""
+    instance_id: InstanceId
 
-    @abc.abstractmethod
-    def stop_service(self, instance: InstanceDescriptor) -> PythonRuntimeResult:
-        """Stop the service instance."""
 
-    @abc.abstractmethod
-    def execute(self, call_info: CallInfo, arguments: bytes) -> PythonRuntimeResult:
-        """Execute the transaction."""
+class Caller(NamedTuple):
+    """TODO"""
 
-    @abc.abstractmethod
-    def artifact_protobuf_spec(self, artifact: ArtifactId) -> Optional[ArtifactProtobufSpec]:
-        """Retrieve artifact protobuf sources."""
+    caller: Union[CallerTransaction, CallerService]
 
-    @abc.abstractmethod
-    def state_hashes(self) -> StateHashAggregator:
-        """Gets the state hashes of the every available service."""
 
-    @abc.abstractmethod
-    def before_commit(self) -> None:
-        """Callback to be called before the block commit."""
+class ExecutionContext(NamedTuple):
+    """TODO"""
 
-    @abc.abstractmethod
-    def after_commit(self, service_keypair: KeyPair) -> None:
-        """Callback to be called after the block commit."""
+    access: RawIndexAccess
+    caller: Caller
+    interface_name: str

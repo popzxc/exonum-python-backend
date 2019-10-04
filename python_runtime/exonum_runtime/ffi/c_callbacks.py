@@ -11,6 +11,8 @@ from .raw_types import (
     RawStateHashAggregator,
     RawArtifactProtobufSpec,
     RawPythonMethods,
+    RawExecutionContext,
+    RawIndexAccess,
 )
 from .ffi_provider import RustFFIProvider
 
@@ -22,7 +24,7 @@ _RESOURCES: Set[c.c_void_p] = set()
 _MERKLEDB_ALLOCATED: List[Any] = list()
 
 
-@c.CFUNCTYPE(c.c_bool, RawArtifactId, c.POINTER(c.c_ubyte), c.c_uint64)
+@c.CFUNCTYPE(c.c_uint32, RawArtifactId, c.POINTER(c.c_ubyte), c.c_uint64)
 def deploy_artifact(raw_artifact, raw_data, raw_data_len):  # type: ignore # Signature is one line above.
     """Function called from Rust to indicate an artifact deploy request."""
     artifact_id = raw_artifact.into_artifact_id()
@@ -57,8 +59,8 @@ def start_service(raw_spec):  # type: ignore # Signature is one line above.
     return result.result.value
 
 
-@c.CFUNCTYPE(c.c_uint32, RawInstanceDescriptor, c.POINTER(c.c_uint8), c.c_uint32)
-def initialize_service(descriptor, parameters, parameters_len):  # type: ignore # Signature is one line above.
+@c.CFUNCTYPE(c.c_uint32, RawIndexAccess, RawInstanceDescriptor, c.POINTER(c.c_uint8), c.c_uint32)
+def initialize_service(access, descriptor, parameters, parameters_len):  # type: ignore # Signature is one line above.
     """Configure service instance"""
     instance_descriptor = descriptor.into_instance_descriptor()
 
@@ -66,7 +68,7 @@ def initialize_service(descriptor, parameters, parameters_len):  # type: ignore 
 
     ffi = RustFFIProvider.instance()
 
-    result = ffi.runtime().initialize_service(instance_descriptor, parameters_bytes)
+    result = ffi.runtime().initialize_service(access, instance_descriptor, parameters_bytes)
 
     return result.value
 
@@ -83,26 +85,28 @@ def stop_service(descriptor):  # type: ignore # Signature is one line above.
     return result.value
 
 
-@c.CFUNCTYPE(c.c_uint32, RawCallInfo, c.POINTER(c.c_uint8), c.c_uint32)
-def execute(raw_call_info, parameters, parameters_len):  # type: ignore # Signature is one line above.
+@c.CFUNCTYPE(c.c_uint32, RawExecutionContext, RawCallInfo, c.POINTER(c.c_uint8), c.c_uint32)
+def execute(raw_call_info, raw_context, parameters, parameters_len):  # type: ignore # Signature is one line above.
     """Execute a transaction."""
     call_info = raw_call_info.into_call_info()
 
     parameters_bytes = bytes((c.c_ubyte * parameters_len.value).from_buffer(parameters)[:])
 
+    context = raw_context.into_execution_context()
+
     ffi = RustFFIProvider.instance()
 
-    result = ffi.runtime().execute(call_info, parameters_bytes)
+    result = ffi.runtime().execute(context, call_info, parameters_bytes)
 
     return result.value
 
 
 @c.CFUNCTYPE(None, c.POINTER(c.POINTER(RawStateHashAggregator)))
-def state_hashes(state_hash_aggregator):  # type: ignore # Signature is one line above.
+def state_hashes(access, state_hash_aggregator):  # type: ignore # Signature is one line above.
     """Function called from Rust to retrieve state hashes."""
     ffi = RustFFIProvider.instance()
 
-    hashes = ffi.runtime().state_hashes()
+    hashes = ffi.runtime().state_hashes(access)
 
     raw_state_hashes = RawStateHashAggregator.from_state_hash_aggregator(hashes)
     raw_state_hashes_ptr = c.pointer(raw_state_hashes)
@@ -133,11 +137,11 @@ def artifact_protobuf_spec(raw_artifact_id, spec):  # type: ignore # Signature i
 
 
 @c.CFUNCTYPE(None)
-def before_commit():  # type: ignore # Signature is one line above.
+def before_commit(access):  # type: ignore # Signature is one line above.
     """Before commit callback."""
     ffi = RustFFIProvider.instance()
 
-    ffi.runtime().before_commit()
+    ffi.runtime().before_commit(access)
 
 
 @c.CFUNCTYPE(c.c_void_p, c.c_uint64)
@@ -151,12 +155,11 @@ def merkledb_allocate(length: int):  # type: ignore # Signature is one line abov
 
 
 @c.CFUNCTYPE(None, c.c_void_p)
-def after_commit(_fork):  # type: ignore # Signature is one line above.
+def after_commit(access):  # type: ignore # Signature is one line above.
     """After commit callback."""
     ffi = RustFFIProvider.instance()
 
-    # TODO fix call
-    ffi.runtime().after_commit()
+    ffi.runtime().after_commit(access)
 
 
 @c.CFUNCTYPE(None, c.c_void_p)

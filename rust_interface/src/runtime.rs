@@ -185,7 +185,13 @@ impl Runtime for PythonRuntime {
 
         let result = unsafe {
             let (payload_bytes_ptr, payload_bytes_len) = into_ptr_and_len(&payload);
-            let python_execution_context = RawExecutionContext::from_execution_context(context);
+
+            let access = RawIndexAccess::Fork(context.fork);
+
+            let python_execution_context = RawExecutionContext::from_execution_context(
+                context,
+                &access as *const RawIndexAccess,
+            );
             let python_call_info = RawCallInfo::from_call_info(call_info);
 
             (python_interface.methods.execute)(

@@ -137,17 +137,20 @@ impl RawCaller {
 }
 
 #[repr(C)]
-pub struct RawExecutionContext {
-    pub fork: *const Fork,
+pub struct RawExecutionContext<'a> {
+    pub access: *const RawIndexAccess<'a>,
     pub caller: RawCaller,
     pub interface_name: *const c_char,
     // TODO: store dispatcher ref for calling transactions.
 }
 
-impl RawExecutionContext {
-    pub unsafe fn from_execution_context(context: &ExecutionContext) -> RawExecutionContext {
+impl<'a> RawExecutionContext<'a> {
+    pub unsafe fn from_execution_context(
+        context: &'a ExecutionContext,
+        access: *const RawIndexAccess<'a>,
+    ) -> RawExecutionContext<'a> {
         RawExecutionContext {
-            fork: context.fork as *const Fork,
+            access,
             caller: RawCaller::from_caller(&context.caller),
             interface_name: context.interface_name.as_ptr() as *const c_char,
         }

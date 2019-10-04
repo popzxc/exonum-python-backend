@@ -13,7 +13,6 @@ from exonum_runtime.proto import PythonArtifactSpec, ParseError
 
 from .artifact import Artifact
 from .types import (
-    RuntimeInterface,
     ArtifactId,
     InstanceSpec,
     DeploymentResult,
@@ -22,9 +21,12 @@ from .types import (
     CallInfo,
     StateHashAggregator,
     ArtifactProtobufSpec,
+    ExecutionContext,
+    RawIndexAccess,
 )
 from .config import Configuration
 from .runtime_api import RuntimeApi
+from .runtime_interface import RuntimeInterface
 
 
 class Instance:
@@ -107,23 +109,25 @@ class PythonRuntime(RuntimeInterface):
     def start_instance(self, instance_spec: InstanceSpec) -> PythonRuntimeResult:
         raise NotImplementedError
 
-    def initialize_service(self, instance: InstanceDescriptor, parameters: bytes) -> PythonRuntimeResult:
+    def initialize_service(
+        self, access: RawIndexAccess, instance: InstanceDescriptor, parameters: bytes
+    ) -> PythonRuntimeResult:
         raise NotImplementedError
 
     def stop_service(self, instance: InstanceDescriptor) -> PythonRuntimeResult:
         raise NotImplementedError
 
-    def execute(self, call_info: CallInfo, arguments: bytes) -> PythonRuntimeResult:
+    def execute(self, context: ExecutionContext, call_info: CallInfo, arguments: bytes) -> PythonRuntimeResult:
         raise NotImplementedError
 
     def artifact_protobuf_spec(self, artifact: ArtifactId) -> Optional[ArtifactProtobufSpec]:
         raise NotImplementedError
 
-    def state_hashes(self) -> StateHashAggregator:
+    def state_hashes(self, access: RawIndexAccess) -> StateHashAggregator:
         raise NotImplementedError
 
-    def before_commit(self) -> None:
+    def before_commit(self, access: RawIndexAccess) -> None:
         raise NotImplementedError
 
-    def after_commit(self, service_keypair: KeyPair) -> None:
+    def after_commit(self, access: RawIndexAccess) -> None:
         raise NotImplementedError
