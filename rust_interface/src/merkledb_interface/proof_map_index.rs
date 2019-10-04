@@ -1,9 +1,10 @@
 use std::os::raw::c_char;
 
-use exonum_merkledb::{Fork, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{Fork, ObjectHash, ProofMapIndex, Snapshot};
 
 use super::binary_data::BinaryData;
 use super::common::parse_string;
+use crate::types::RawIndexAccess;
 
 #[repr(C)]
 pub struct RawProofMapIndexMethods {
@@ -27,8 +28,8 @@ impl Default for RawProofMapIndexMethods {
 }
 
 #[repr(C)]
-pub struct RawProofMapIndex {
-    pub fork: *const Fork,
+pub struct RawProofMapIndex<'a> {
+    pub access: *const RawIndexAccess<'a>,
     pub index_name: *const c_char,
 
     pub methods: RawProofMapIndexMethods,
@@ -36,11 +37,11 @@ pub struct RawProofMapIndex {
 
 #[no_mangle]
 pub unsafe fn merkledb_proof_map_index(
-    fork: *const Fork,
+    access: *const RawIndexAccess,
     index_name: *const c_char,
 ) -> RawProofMapIndex {
     RawProofMapIndex {
-        fork,
+        access,
         index_name,
         methods: RawProofMapIndexMethods::default(),
     }
@@ -70,10 +71,18 @@ unsafe extern "C" fn get(
 
     let key = key.to_vec();
 
-    let fork = &*index.fork;
-    let index: ProofMapIndex<&Fork, Vec<u8>, Vec<u8>> = ProofMapIndex::new(index_name, fork);
-
-    let value = index.get(&key);
+    let value = match *index.access {
+        RawIndexAccess::Fork(fork) => {
+            let index: ProofMapIndex<&Fork, Vec<u8>, Vec<u8>> =
+                ProofMapIndex::new(index_name, fork);
+            index.get(&key)
+        }
+        RawIndexAccess::Snapshot(snapshot) => {
+            let index: ProofMapIndex<&dyn Snapshot, Vec<u8>, Vec<u8>> =
+                ProofMapIndex::new(index_name, snapshot);
+            index.get(&key)
+        }
+    };
 
     match value {
         Some(data) => {
@@ -99,10 +108,17 @@ unsafe extern "C" fn put(index: *const RawProofMapIndex, key: BinaryData, value:
     let key: Vec<u8> = key.to_vec();
     let value: Vec<u8> = value.to_vec();
 
-    let fork = &*index.fork;
-    let mut index: ProofMapIndex<&Fork, Vec<u8>, Vec<u8>> = ProofMapIndex::new(index_name, fork);
+    match *index.access {
+        RawIndexAccess::Fork(fork) => {
+            let mut index: ProofMapIndex<&Fork, Vec<u8>, Vec<u8>> =
+                ProofMapIndex::new(index_name, fork);
 
-    index.put(&key, value);
+            index.put(&key, value);
+        }
+        RawIndexAccess::Snapshot(_) => {
+            panic!("Attempt to call mutable method with a snapshot");
+        }
+    }
 }
 
 unsafe extern "C" fn remove(index: *const RawProofMapIndex, key: BinaryData) {
@@ -110,30 +126,52 @@ unsafe extern "C" fn remove(index: *const RawProofMapIndex, key: BinaryData) {
     let index_name = parse_string(index.index_name);
     let key: Vec<u8> = key.to_vec();
 
-    let fork = &*index.fork;
-    let mut index: ProofMapIndex<&Fork, Vec<u8>, Vec<u8>> = ProofMapIndex::new(index_name, fork);
+    match *index.access {
+        RawIndexAccess::Fork(fork) => {
+            let mut index: ProofMapIndex<&Fork, Vec<u8>, Vec<u8>> =
+                ProofMapIndex::new(index_name, fork);
 
-    index.remove(&key);
+            index.remove(&key);
+        }
+        RawIndexAccess::Snapshot(_) => {
+            panic!("Attempt to call mutable method with a snapshot");
+        }
+    }
 }
 
 unsafe extern "C" fn clear(index: *const RawProofMapIndex) {
     let index = &*index;
     let index_name = parse_string(index.index_name);
 
-    let fork = &*index.fork;
-    let mut index: ProofMapIndex<&Fork, Vec<u8>, Vec<u8>> = ProofMapIndex::new(index_name, fork);
+    match *index.access {
+        RawIndexAccess::Fork(fork) => {
+            let mut index: ProofMapIndex<&Fork, Vec<u8>, Vec<u8>> =
+                ProofMapIndex::new(index_name, fork);
 
-    index.clear();
+            index.clear();
+        }
+        RawIndexAccess::Snapshot(_) => {
+            panic!("Attempt to call mutable method with a snapshot");
+        }
+    }
 }
 
 unsafe extern "C" fn object_hash(index: *const RawProofMapIndex, allocate: Allocate) -> BinaryData {
     let index = &*index;
     let index_name = parse_string(index.index_name);
 
-    let fork = &*index.fork;
-    let index: ProofMapIndex<&Fork, Vec<u8>, Vec<u8>> = ProofMapIndex::new(index_name, fork);
-
-    let value = index.object_hash();
+    let value = match *index.access {
+        RawIndexAccess::Fork(fork) => {
+            let index: ProofMapIndex<&Fork, Vec<u8>, Vec<u8>> =
+                ProofMapIndex::new(index_name, fork);
+            index.object_hash()
+        }
+        RawIndexAccess::Snapshot(snapshot) => {
+            let index: ProofMapIndex<&dyn Snapshot, Vec<u8>, Vec<u8>> =
+                ProofMapIndex::new(index_name, snapshot);
+            index.object_hash()
+        }
+    };
     let data: &[u8] = value.as_ref();
 
     let buffer: *mut u8 = allocate(data.len() as u64);

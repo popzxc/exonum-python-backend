@@ -1,3 +1,4 @@
+use std::os::raw::c_void;
 use std::process::Child;
 
 use futures::{Future, IntoFuture};
@@ -18,7 +19,10 @@ use super::{
     errors::PythonRuntimeError,
     pending_deployment::PendingDeployment,
     python_interface::{PythonRuntimeInterface, PYTHON_INTERFACE},
-    types::{into_ptr_and_len, RawArtifactId, RawInstanceDescriptor, RawInstanceSpec},
+    types::{
+        into_ptr_and_len, RawArtifactId, RawArtifactProtobufSpec, RawCallInfo, RawExecutionContext,
+        RawIndexAccess, RawInstanceDescriptor, RawInstanceSpec, RawStateHashAggregator,
+    },
 };
 
 /// Sample runtime.
@@ -59,7 +63,6 @@ impl PythonRuntime {
 }
 
 impl Runtime for PythonRuntime {
-    /// TODO
     fn deploy_artifact(
         &mut self,
         artifact: ArtifactId,
@@ -100,7 +103,6 @@ impl Runtime for PythonRuntime {
         }
     }
 
-    /// TODO
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
         if self.ensure_runtime().is_err() {
             return false;
@@ -114,7 +116,6 @@ impl Runtime for PythonRuntime {
         }
     }
 
-    /// TODO
     fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
         self.ensure_runtime()?;
 
@@ -129,10 +130,9 @@ impl Runtime for PythonRuntime {
         PythonRuntimeInterface::error_code_to_result(result).map_err(From::from)
     }
 
-    /// TODO
     fn initialize_service(
         &self,
-        _context: &Fork,
+        fork: &Fork,
         descriptor: InstanceDescriptor,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
@@ -144,8 +144,11 @@ impl Runtime for PythonRuntime {
             let python_instance_descriptor =
                 RawInstanceDescriptor::from_instance_descriptor(&descriptor);
 
+            let access = RawIndexAccess::Fork(fork);
+
             let (parameters_bytes_ptr, parameters_bytes_len) = into_ptr_and_len(&parameters);
             (python_interface.methods.initialize_service)(
+                &access as *const RawIndexAccess,
                 python_instance_descriptor,
                 parameters_bytes_ptr,
                 parameters_bytes_len as u64,
@@ -155,48 +158,125 @@ impl Runtime for PythonRuntime {
         PythonRuntimeInterface::error_code_to_result(result).map_err(From::from)
     }
 
-    /// TODO
-    fn stop_service(&mut self, _descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
+    fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
         self.ensure_runtime()?;
 
-        Ok(())
+        let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
+
+        let result = unsafe {
+            let python_instance_descriptor =
+                RawInstanceDescriptor::from_instance_descriptor(&descriptor);
+
+            (python_interface.methods.stop_service)(python_instance_descriptor)
+        };
+
+        PythonRuntimeInterface::error_code_to_result(result).map_err(From::from)
     }
 
-    /// TODO
     fn execute(
         &self,
-        _context: &ExecutionContext,
-        _call_info: &CallInfo,
-        _payload: &[u8],
+        context: &ExecutionContext,
+        call_info: &CallInfo,
+        payload: &[u8],
     ) -> Result<(), ExecutionError> {
         self.ensure_runtime()?;
 
-        Ok(())
+        let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
+
+        let result = unsafe {
+            let (payload_bytes_ptr, payload_bytes_len) = into_ptr_and_len(&payload);
+            let python_execution_context = RawExecutionContext::from_execution_context(context);
+            let python_call_info = RawCallInfo::from_call_info(call_info);
+
+            (python_interface.methods.execute)(
+                python_execution_context,
+                python_call_info,
+                payload_bytes_ptr,
+                payload_bytes_len as u32,
+            )
+        };
+
+        PythonRuntimeInterface::error_code_to_result(result).map_err(From::from)
     }
 
-    /// TODO
-    fn artifact_protobuf_spec(&self, _id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
+    fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {
         self.ensure_runtime().ok()?;
+        let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
-        // self.deployed_artifacts
-        //     .get(id)
-        //     .map(|_| ArtifactProtobufSpec::default())
-        None
+        unsafe {
+            let python_artifact_id = RawArtifactId::from_artifact_id(id);
+            let raw_protobuf_spec_ptr: *mut RawArtifactProtobufSpec =
+                std::ptr::null::<RawArtifactProtobufSpec>() as *mut RawArtifactProtobufSpec;
+
+            (python_interface.methods.artifact_protobuf_spec)(
+                python_artifact_id,
+                &raw_protobuf_spec_ptr as *const *mut RawArtifactProtobufSpec,
+            );
+
+            // Pointer will be nullptr if there is no protobuf spec for requested artifact.
+            if raw_protobuf_spec_ptr
+                != std::ptr::null::<RawArtifactProtobufSpec>() as *mut RawArtifactProtobufSpec
+            {
+                let spec = ArtifactProtobufSpec::from(*raw_protobuf_spec_ptr);
+
+                // Python allocated resources for us, don't forget to free it.
+                (python_interface.methods.free_resource)(raw_protobuf_spec_ptr as *const c_void);
+
+                Some(spec)
+            } else {
+                None
+            }
+        }
     }
 
-    /// TODO
-    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
+    fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator {
         if self.ensure_runtime().is_err() {
             return StateHashAggregator::default();
         }
 
-        StateHashAggregator::default()
+        let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
+
+        unsafe {
+            let raw_state_hash_aggregator_ptr: *mut RawStateHashAggregator =
+                std::ptr::null::<RawStateHashAggregator>() as *mut RawStateHashAggregator;
+
+            let access = RawIndexAccess::Snapshot(snapshot);
+
+            (python_interface.methods.state_hashes)(
+                &access as *const RawIndexAccess,
+                &raw_state_hash_aggregator_ptr as *const *mut RawStateHashAggregator,
+            );
+
+            // Check agains nullptr just in case.
+            if raw_state_hash_aggregator_ptr
+                != std::ptr::null::<RawStateHashAggregator>() as *mut RawStateHashAggregator
+            {
+                let state_hash_aggregator =
+                    StateHashAggregator::from(*raw_state_hash_aggregator_ptr);
+
+                // Python allocated resources for us, don't forget to free it.
+                (python_interface.methods.free_resource)(
+                    raw_state_hash_aggregator_ptr as *const c_void,
+                );
+
+                state_hash_aggregator
+            } else {
+                StateHashAggregator::default()
+            }
+        }
     }
 
-    /// TODO
-    fn before_commit(&self, _dispatcher: &DispatcherRef, _fork: &mut Fork) {
+    fn before_commit(&self, _dispatcher: &DispatcherRef, fork: &mut Fork) {
         if self.ensure_runtime().is_err() {
             return;
+        }
+
+        let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
+
+        unsafe {
+            let access = RawIndexAccess::Fork(fork);
+
+            (python_interface.methods.before_commit)(&access as *const RawIndexAccess);
         }
     }
 
@@ -204,12 +284,20 @@ impl Runtime for PythonRuntime {
     fn after_commit(
         &self,
         _dispatcher: &DispatcherSender,
-        _snapshot: &dyn Snapshot,
+        snapshot: &dyn Snapshot,
         _service_keypair: &(PublicKey, SecretKey),
         _tx_sender: &ApiSender,
     ) {
         if self.ensure_runtime().is_err() {
             return;
+        }
+
+        let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
+
+        unsafe {
+            let access = RawIndexAccess::Snapshot(snapshot);
+
+            (python_interface.methods.before_commit)(&access as *const RawIndexAccess);
         }
     }
 }

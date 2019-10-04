@@ -3,8 +3,11 @@ use std::os::raw::c_char;
 
 use exonum::crypto::Hash;
 use exonum::runtime::{
-    ArtifactId, CallInfo, InstanceDescriptor, InstanceId, InstanceSpec, StateHashAggregator,
+    ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
+    InstanceId, InstanceSpec, ProtoSourceFile, StateHashAggregator,
 };
+
+use exonum_merkledb::{Fork, Snapshot};
 
 pub unsafe fn into_ptr_and_len(data: &[u8]) -> (*const u8, usize) {
     let data_ptr: *const u8 = data.as_ptr();
@@ -100,6 +103,58 @@ impl RawInstanceDescriptor {
 }
 
 #[repr(C)]
+pub struct RawCaller {
+    pub tx_type: u32,
+
+    // Will be set if type is Transaction. Otherwise will be nullptr.
+    pub hash: *const u8,
+    pub author: *const u8,
+
+    // Will be set if type is Service. Otherwise will be 0.
+    pub instance_id: u32,
+}
+
+impl RawCaller {
+    pub unsafe fn from_caller(caller: &Caller) -> RawCaller {
+        match caller {
+            Caller::Transaction {
+                ref hash,
+                ref author,
+            } => RawCaller {
+                tx_type: 0,
+                hash: hash.as_ref().as_ptr(),
+                author: author.as_ref().as_ptr(),
+                instance_id: 0,
+            },
+            Caller::Service { instance_id } => RawCaller {
+                tx_type: 1,
+                hash: std::ptr::null::<u8>(),
+                author: std::ptr::null::<u8>(),
+                instance_id: *instance_id,
+            },
+        }
+    }
+}
+
+#[repr(C)]
+pub struct RawExecutionContext {
+    pub fork: *const Fork,
+    pub caller: RawCaller,
+    pub interface_name: *const c_char,
+    // TODO: store dispatcher ref for calling transactions.
+}
+
+impl RawExecutionContext {
+    pub unsafe fn from_execution_context(context: &ExecutionContext) -> RawExecutionContext {
+        RawExecutionContext {
+            fork: context.fork as *const Fork,
+            caller: RawCaller::from_caller(&context.caller),
+            interface_name: context.interface_name.as_ptr() as *const c_char,
+        }
+    }
+}
+
+#[repr(C)]
 pub struct RawCallInfo {
     pub instance_id: u32,
     pub method_id: u32,
@@ -138,6 +193,7 @@ impl From<RawHash> for Hash {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct RawStateHashAggregator {
     pub hashes: *const (*const RawHash),
     pub hashes_length: *const u32,
@@ -184,13 +240,42 @@ impl From<RawStateHashAggregator> for StateHashAggregator {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct RawProtoSourceFile {
     pub name: *const c_char,
     pub content: *const c_char,
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct RawArtifactProtobufSpec {
     pub files: *const RawProtoSourceFile,
     pub files_amount: u32,
+}
+
+impl From<RawArtifactProtobufSpec> for ArtifactProtobufSpec {
+    fn from(spec: RawArtifactProtobufSpec) -> ArtifactProtobufSpec {
+        fn to_str(data: *const c_char) -> String {
+            unsafe { CStr::from_ptr(data).to_string_lossy().into_owned() }
+        }
+
+        let raw_files =
+            unsafe { std::slice::from_raw_parts(spec.files, spec.files_amount as usize) };
+
+        let sources = raw_files
+            .iter()
+            .map(|f| ProtoSourceFile {
+                name: to_str(f.name),
+                content: to_str(f.content),
+            })
+            .collect();
+
+        ArtifactProtobufSpec { sources }
+    }
+}
+
+#[derive(Debug)]
+pub enum RawIndexAccess<'a> {
+    Fork(&'a Fork),
+    Snapshot(&'a dyn Snapshot),
 }

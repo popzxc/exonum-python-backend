@@ -1,9 +1,10 @@
 use std::os::raw::c_char;
 
-use exonum_merkledb::{Fork, ListIndex};
+use exonum_merkledb::{Fork, ListIndex, Snapshot};
 
 use super::binary_data::BinaryData;
 use super::common::parse_string;
+use crate::types::RawIndexAccess;
 
 #[repr(C)]
 pub struct RawListIndexMethods {
@@ -29,17 +30,20 @@ impl Default for RawListIndexMethods {
 }
 
 #[repr(C)]
-pub struct RawListIndex {
-    pub fork: *const Fork,
+pub struct RawListIndex<'a> {
+    pub access: *const RawIndexAccess<'a>,
     pub index_name: *const c_char,
 
     pub methods: RawListIndexMethods,
 }
 
 #[no_mangle]
-pub unsafe fn merkledb_list_index(fork: *const Fork, index_name: *const c_char) -> RawListIndex {
+pub unsafe fn merkledb_list_index(
+    access: *const RawIndexAccess,
+    index_name: *const c_char,
+) -> RawListIndex {
     RawListIndex {
-        fork,
+        access,
         index_name,
         methods: RawListIndexMethods::default(),
     }
@@ -60,10 +64,16 @@ unsafe extern "C" fn get(index: *const RawListIndex, idx: u64, allocate: Allocat
     let index = &*index;
     let index_name = parse_string(index.index_name);
 
-    let fork = &*index.fork;
-    let index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
-
-    let value = index.get(idx);
+    let value = match *index.access {
+        RawIndexAccess::Fork(fork) => {
+            let index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
+            index.get(idx)
+        }
+        RawIndexAccess::Snapshot(snapshot) => {
+            let index: ListIndex<&dyn Snapshot, Vec<u8>> = ListIndex::new(index_name, snapshot);
+            index.get(idx)
+        }
+    };
 
     match value {
         Some(data) => {
@@ -88,36 +98,48 @@ unsafe extern "C" fn push(index: *const RawListIndex, value: BinaryData) {
     let index_name = parse_string(index.index_name);
     let value: Vec<u8> = value.to_vec();
 
-    let fork = &*index.fork;
-    let mut index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
+    match *index.access {
+        RawIndexAccess::Fork(fork) => {
+            let mut index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
 
-    index.push(value);
+            index.push(value);
+        }
+        RawIndexAccess::Snapshot(_) => {
+            panic!("Attempt to call mutable method with a snapshot");
+        }
+    }
 }
 
 unsafe extern "C" fn pop(index: *const RawListIndex, allocate: Allocate) -> BinaryData {
     let index = &*index;
     let index_name = parse_string(index.index_name);
 
-    let fork = &*index.fork;
-    let mut index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
+    match *index.access {
+        RawIndexAccess::Fork(fork) => {
+            let mut index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
 
-    let value = index.pop();
+            let value = index.pop();
 
-    match value {
-        Some(data) => {
-            let buffer: *mut u8 = allocate(data.len() as u64);
+            match value {
+                Some(data) => {
+                    let buffer: *mut u8 = allocate(data.len() as u64);
 
-            std::ptr::copy(data.as_ptr(), buffer, data.len());
+                    std::ptr::copy(data.as_ptr(), buffer, data.len());
 
-            BinaryData {
-                data: buffer,
-                data_len: data.len() as u64,
+                    BinaryData {
+                        data: buffer,
+                        data_len: data.len() as u64,
+                    }
+                }
+                None => BinaryData {
+                    data: std::ptr::null::<u8>(),
+                    data_len: 0,
+                },
             }
         }
-        None => BinaryData {
-            data: std::ptr::null::<u8>(),
-            data_len: 0,
-        },
+        RawIndexAccess::Snapshot(_) => {
+            panic!("Attempt to call mutable method with a snapshot");
+        }
     }
 }
 
@@ -125,10 +147,16 @@ unsafe extern "C" fn len(index: *const RawListIndex) -> u64 {
     let index = &*index;
     let index_name = parse_string(index.index_name);
 
-    let fork = &*index.fork;
-    let index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
-
-    index.len() as u64
+    match *index.access {
+        RawIndexAccess::Fork(fork) => {
+            let index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
+            index.len() as u64
+        }
+        RawIndexAccess::Snapshot(snapshot) => {
+            let index: ListIndex<&dyn Snapshot, Vec<u8>> = ListIndex::new(index_name, snapshot);
+            index.len() as u64
+        }
+    }
 }
 
 unsafe extern "C" fn set(index: *const RawListIndex, idx: u64, value: BinaryData) {
@@ -136,18 +164,30 @@ unsafe extern "C" fn set(index: *const RawListIndex, idx: u64, value: BinaryData
     let index_name = parse_string(index.index_name);
     let value: Vec<u8> = value.to_vec();
 
-    let fork = &*index.fork;
-    let mut index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
+    match *index.access {
+        RawIndexAccess::Fork(fork) => {
+            let mut index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
 
-    index.set(idx, value);
+            index.set(idx, value);
+        }
+        RawIndexAccess::Snapshot(_) => {
+            panic!("Attempt to call mutable method with a snapshot");
+        }
+    }
 }
 
 unsafe extern "C" fn clear(index: *const RawListIndex) {
     let index = &*index;
     let index_name = parse_string(index.index_name);
 
-    let fork = &*index.fork;
-    let mut index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
+    match *index.access {
+        RawIndexAccess::Fork(fork) => {
+            let mut index: ListIndex<&Fork, Vec<u8>> = ListIndex::new(index_name, fork);
 
-    index.clear();
+            index.clear();
+        }
+        RawIndexAccess::Snapshot(_) => {
+            panic!("Attempt to call mutable method with a snapshot");
+        }
+    }
 }

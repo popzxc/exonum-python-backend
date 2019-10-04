@@ -3,12 +3,14 @@ use std::os::raw::c_void;
 use std::sync::RwLock;
 
 use exonum::runtime::ArtifactId;
-use exonum_merkledb::Fork;
 
 use super::{
     errors::PythonRuntimeError,
     pending_deployment::PendingDeployment,
-    types::{RawArtifactId, RawCallInfo, RawInstanceDescriptor, RawInstanceSpec},
+    types::{
+        RawArtifactId, RawArtifactProtobufSpec, RawCallInfo, RawExecutionContext, RawIndexAccess,
+        RawInstanceDescriptor, RawInstanceSpec, RawStateHashAggregator,
+    },
 };
 
 lazy_static! {
@@ -48,22 +50,31 @@ type PythonDeployArtifactMethod =
 type PythonIsArtifactDeployedMethod = unsafe extern "C" fn(artifact: RawArtifactId) -> bool;
 type PythonStartServiceMethod = unsafe extern "C" fn(spec: RawInstanceSpec) -> u32;
 type PythonInitializeServiceMethod = unsafe extern "C" fn(
+    fork: *const RawIndexAccess,
     descriptor: RawInstanceDescriptor,
     parameters: *const u8,
     parameters_len: u64,
 ) -> u32;
 type PythonStopServiceMethod = unsafe extern "C" fn(descriptor: RawInstanceDescriptor) -> u32;
-type PythonExecuteMethod =
-    unsafe extern "C" fn(call_info: RawCallInfo, payload: *const u8, payload_len: u32) -> u32;
-type PythonArtifactProtobufSpecMethod = unsafe extern "C" fn();
-type PythonStateHashesMethod = unsafe extern "C" fn();
-type PythonBeforeCommitMethod = unsafe extern "C" fn();
-type PythonAfterCommitMethod = unsafe extern "C" fn(fork: *const Fork);
+type PythonExecuteMethod = unsafe extern "C" fn(
+    context: RawExecutionContext,
+    call_info: RawCallInfo,
+    payload: *const u8,
+    payload_len: u32,
+) -> u32;
+type PythonArtifactProtobufSpecMethod =
+    unsafe extern "C" fn(_id: RawArtifactId, _spec: *const *mut RawArtifactProtobufSpec);
+type PythonStateHashesMethod = unsafe extern "C" fn(
+    fork: *const RawIndexAccess,
+    _aggregator: *const *mut RawStateHashAggregator,
+);
+type PythonBeforeCommitMethod = unsafe extern "C" fn(fork: *const RawIndexAccess);
+type PythonAfterCommitMethod = unsafe extern "C" fn(fork: *const RawIndexAccess);
 type PythonFreeResourceMethod = unsafe extern "C" fn(resource: *const c_void);
 
 /// Structure with the Python side API.
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct PythonMethods {
     pub deploy_artifact: PythonDeployArtifactMethod,
     pub is_artifact_deployed: PythonIsArtifactDeployedMethod,
@@ -76,6 +87,12 @@ pub struct PythonMethods {
     pub before_commit: PythonBeforeCommitMethod,
     pub after_commit: PythonAfterCommitMethod,
     pub free_resource: PythonFreeResourceMethod,
+}
+
+impl std::fmt::Debug for PythonMethods {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PythonMethods").finish()
+    }
 }
 
 impl Default for PythonMethods {
@@ -151,6 +168,7 @@ unsafe extern "C" fn default_start_service(_spec: RawInstanceSpec) -> u32 {
 }
 
 unsafe extern "C" fn default_initialize_service_method(
+    _fork: *const RawIndexAccess,
     _descriptor: RawInstanceDescriptor,
     _parameters: *const u8,
     _parameters_len: u64,
@@ -163,14 +181,23 @@ unsafe extern "C" fn default_stop_service_method(_descriptor: RawInstanceDescrip
 }
 
 unsafe extern "C" fn default_execute_method(
+    _context: RawExecutionContext,
     _call_info: RawCallInfo,
     _payload: *const u8,
     _payload_len: u32,
 ) -> u32 {
     PythonRuntimeError::RuntimeNotReady as u32
 }
-unsafe extern "C" fn default_artifact_protobuf_spec_method() {}
-unsafe extern "C" fn default_state_hashes_method() {}
-unsafe extern "C" fn default_before_commit_method() {}
-unsafe extern "C" fn default_after_commit_method(_fork: *const Fork) {}
+unsafe extern "C" fn default_artifact_protobuf_spec_method(
+    _id: RawArtifactId,
+    _spec: *const *mut RawArtifactProtobufSpec,
+) {
+}
+unsafe extern "C" fn default_state_hashes_method(
+    _fork: *const RawIndexAccess,
+    _aggregator: *const *mut RawStateHashAggregator,
+) {
+}
+unsafe extern "C" fn default_before_commit_method(_fork: *const RawIndexAccess) {}
+unsafe extern "C" fn default_after_commit_method(_fork: *const RawIndexAccess) {}
 unsafe extern "C" fn default_free_resource_method(_resource: *const c_void) {}
