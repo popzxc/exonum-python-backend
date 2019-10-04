@@ -1,6 +1,6 @@
 """TODO"""
 
-from typing import Tuple, Dict, Any, List, Type
+from typing import Tuple, Dict, Any, List
 
 from exonum_runtime.interfaces import Named
 from .indices.base_index import BaseIndex

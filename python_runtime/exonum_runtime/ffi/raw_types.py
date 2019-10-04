@@ -3,7 +3,7 @@
 from typing import List, Tuple, Any
 import ctypes as c
 
-from exonum_runtime.types import (
+from exonum_runtime.runtime.types import (
     ArtifactId,
     InstanceSpec,
     StateHashAggregator,

@@ -12,7 +12,7 @@ from .raw_types import (
     RawArtifactProtobufSpec,
     RawPythonMethods,
 )
-from .ffi import RustFFIProvider
+from .ffi_provider import RustFFIProvider
 
 # Dynamically allocated resources
 #
