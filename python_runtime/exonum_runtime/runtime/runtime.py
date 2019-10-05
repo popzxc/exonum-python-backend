@@ -33,7 +33,8 @@ from .types import (
 from .config import Configuration
 from .runtime_api import RuntimeApi
 from .runtime_interface import RuntimeInterface
-from .service import Service, ServiceError, GenericServiceError
+from .service import Service
+from .service_error import ServiceError, GenericServiceError
 from .transaction_context import TransactionContext
 
 

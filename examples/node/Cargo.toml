@@ -1,0 +1,13 @@
+[package]
+name = "node"
+version = "0.1.0"
+authors = ["Igor Aleksanov <popzxc@yandex.ru>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+exonum = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }
+exonum-cli = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }
+rust-interface = { version = "0.1.0", path="../../rust_interface"}
+failure = "0.1.5"

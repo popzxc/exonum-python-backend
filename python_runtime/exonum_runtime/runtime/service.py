@@ -1,7 +1,6 @@
 """Service interface."""
 import abc
 from typing import no_type_check, List, NamedTuple, Callable, Dict, Any, Type
-from enum import IntEnum
 import importlib
 
 from google.protobuf.message import Message as ProtobufMessage, DecodeError as ProtobufDecodeError
@@ -13,35 +12,7 @@ from exonum_runtime.merkledb.schema import WithSchema
 
 from .types import ArtifactProtobufSpec
 from .transaction_context import TransactionContext
-
-
-class GenericServiceError(IntEnum):
-    """Enum denoting generic service errors."""
-
-    WRONG_SERVICE_IMPLEMENTATION = 0
-    MALFORMED_CONFIG = 1
-    METHOD_NOT_FOUND = 2
-    MALFORMED_PARAMETERS = 3
-
-
-class ServiceError(Exception):
-    """Base class for service errors.
-
-    Codes for service errors must be in the 16..128 range.
-    If code does not lie in that range, it will be enforced to be 128.
-
-    Codes 0-15 is reserved for the `Service` class to describe generic
-    execution errors."""
-
-    def __init__(self, code: int) -> None:
-        super().__init__("Service error")
-
-        # We need to check that class is exactly ServiceError and not a subclass.
-        # pylint: disable=unidiomatic-typecheck
-        if type(self) != ServiceError and code < 16 or code > 128:
-            code = 128
-
-        self.code = code
+from .service_error import ServiceError, GenericServiceError
 
 
 class _TransactionRoute(NamedTuple):

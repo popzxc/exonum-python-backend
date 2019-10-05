@@ -15,7 +15,7 @@ from .types import (
     RawIndexAccess,
 )
 
-from .service import ServiceError
+from .service_error import ServiceError
 
 
 class RuntimeInterface(metaclass=abc.ABCMeta):

@@ -6,7 +6,7 @@ edition = "2018"
 
 [lib]
 name = "rust_interface"
-crate-type = ["dylib"]
+crate-type = ["rlib", "dylib"]
 
 [dependencies]
 futures = "0.1.25"
