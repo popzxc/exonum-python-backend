@@ -30,8 +30,9 @@ class _WithSchemaMeta(abc.ABCMeta):
         if WithSchema not in bases:
             raise TypeError("Classes with schema should be derived from WithSchema class")
 
-        # Check that class is subclass of Named.
-        if Named not in bases:
+        # Check that class is subclass of `Named`.
+        # To check it we check if any of class bases is subclass of `Named`.
+        if not any(map(lambda t: issubclass(t, Named), bases)):
             raise TypeError("Classes with schema should be subclasses of `Named` class")
 
         # Check that _schema_ attribute is set.

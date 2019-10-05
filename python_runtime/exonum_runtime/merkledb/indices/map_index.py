@@ -4,6 +4,7 @@ from typing import Optional
 
 from exonum_runtime.ffi.merkledb import MerkledbFFI
 from .base_index import BaseIndex
+from ..into_bytes import IntoBytes
 
 
 class MapIndex(BaseIndex):
@@ -12,6 +13,10 @@ class MapIndex(BaseIndex):
     def initialize(self) -> None:
         """Initializes the MapIndex internal structure."""
         # pylint: disable=attribute-defined-outside-init
+        concrete_key, concrete_value = type(self)._two_index_types()
+        self._concrete_key = concrete_key
+        self._concrete_value = concrete_value
+
         ffi = MerkledbFFI.instance()
         self._index = ffi.map_index(self._index_id, self._access.inner())
 
@@ -19,17 +24,25 @@ class MapIndex(BaseIndex):
     # def __iter__(self) -> "_MapIndexIter":
     # return _MapIndexIter(self._index)
 
-    def __getitem__(self, key: bytes) -> Optional[bytes]:
-        return self._index.get(key)
+    def _value_from_bytes(self, value: Optional[bytes]) -> Optional[IntoBytes]:
+        if value is not None:
+            return self._concrete_value.from_bytes(value)
+
+        return None
+
+    def __getitem__(self, key: IntoBytes) -> Optional[IntoBytes]:
+        value = self._index.get(key.into_bytes())
+
+        return self._value_from_bytes(value)
 
     @BaseIndex.mutable
-    def __setitem__(self, key: bytes, value: bytes) -> None:
-        self._index.put(key, value)
+    def __setitem__(self, key: IntoBytes, value: IntoBytes) -> None:
+        self._index.put(key.into_bytes(), value.into_bytes())
 
     @BaseIndex.mutable
-    def __delitem__(self, key: bytes) -> None:
+    def __delitem__(self, key: IntoBytes) -> None:
         """Removes an element from the MapIndex."""
-        self._index.remove(key)
+        self._index.remove(key.into_bytes())
 
     @BaseIndex.mutable
     def clear(self) -> None:
