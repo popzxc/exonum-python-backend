@@ -1,8 +1,9 @@
 """TODO"""
 
 import abc
-from typing import Tuple, Dict, Any, List, Optional, Type
+from typing import Tuple, Dict, Any, List, Optional, Type, Union
 
+from exonum_runtime.crypto import Hash
 from exonum_runtime.interfaces import Named
 from .indices.base_index import BaseIndex
 from .indices import ProofListIndex, ProofMapIndex
@@ -16,10 +17,14 @@ class _WithSchemaMeta(abc.ABCMeta):
     and verifies them.
     """
 
-    def __new__(cls, name: str, bases: Tuple[type, ...], dct: Dict[str, Any]) -> type:  # type: ignore
+    def __new__(cls, name: str, bases: Tuple[type, ...], dct: Dict[str, Any], **kwargs: Any) -> type:  # type: ignore
         if name == "WithSchema":
             # Proxy class, skip it.
-            return super().__new__(cls, name, bases, dct)
+            return super().__new__(  # type: ignore  # mypy doesn't see ABCMeta signature
+                cls, name, bases, dct, **kwargs
+            )
+
+        # TODO refactor code below to be more readable
 
         # Check that class is derived from `WithSchema`.
         if WithSchema not in bases:
@@ -54,7 +59,7 @@ class _WithSchemaMeta(abc.ABCMeta):
         if "__getattr__" in dct:
             raise AttributeError("Classes derived from `WithSchema` should not implement __getattr__")
 
-        new_class = super().__new__(cls, name, bases, dct)
+        new_class = super().__new__(cls, name, bases, dct, **kwargs)  # type: ignore
         return new_class
 
     @staticmethod
@@ -80,7 +85,7 @@ class WithSchema(metaclass=_WithSchemaMeta):
     >>> _state_hash_ = ["wallets"]
 
     Please note that provided names should persist in schema passed to the _schema_ attribute
-    and point to `Proof*Index` type.
+    and point to `Proof*Index` type. Otherwise an exception will be raised.
     """
 
     _schema_: Optional[Type["Schema"]] = None
@@ -88,6 +93,29 @@ class WithSchema(metaclass=_WithSchemaMeta):
 
     def _get_indices(self) -> List[str]:
         return getattr(self, "_schema_meta").values()
+
+    def get_state_hashes(self, access: Access) -> List[Hash]:
+        """Returns a list of state hashes from indices defined in _state_hash_ attribute."""
+        state_hashes: List[Hash] = []
+
+        # Assertions to give static analysis tools hints of invariants.
+        assert self._schema_ is not None
+        assert issubclass(self._schema_, Schema)
+        assert isinstance(self._state_hash_, list)
+        assert isinstance(self, Named)
+
+        # _schema_ is type, it's callable (see check above)
+        # pylint: disable=not-callable
+        schema = self._schema_(self, access)
+
+        # _state_hash_ is a list, it's an iterable (see check above)
+        # pylint: disable=not-an-iterable
+        for index_name in self._state_hash_:
+            index: Union[ProofListIndex, ProofMapIndex] = getattr(schema, index_name)()
+
+            state_hashes.append(index.object_hash())
+
+        return state_hashes
 
 
 class _SchemaMeta(abc.ABCMeta):
@@ -97,10 +125,12 @@ class _SchemaMeta(abc.ABCMeta):
     and initialized metadata.
     """
 
-    def __new__(cls, name: str, bases: Tuple[type, ...], dct: Dict[str, Any]) -> type:  # type: ignore
+    def __new__(cls, name: str, bases: Tuple[type, ...], dct: Dict[str, Any], **kwargs: Any) -> type:  # type: ignore
         if name == "Schema":
             # Proxy class, skip it.
-            return super().__new__(cls, name, bases, dct)
+            return super().__new__(  # type: ignore  # mypy doesn't see ABCMeta signature
+                cls, name, bases, dct, **kwargs
+            )
 
         # Check that class is derived from `Schema`.
         if Schema not in bases:
@@ -119,7 +149,7 @@ class _SchemaMeta(abc.ABCMeta):
 
             dct["_schema_meta"][index_name] = index_type
 
-        new_class = super().__new__(cls, name, bases, dct)
+        new_class = super().__new__(cls, name, bases, dct, **kwargs)  # type: ignore
         return new_class
 
 
