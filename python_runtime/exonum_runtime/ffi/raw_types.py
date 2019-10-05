@@ -60,20 +60,22 @@ class RawArtifactId(c.Structure):
 class RawInstanceSpec(c.Structure):
     """C representation of InstanceSpec used in communication between Python and Rust."""
 
-    _fields_ = [("name", c.c_char_p), ("artifact", RawArtifactId)]
+    _fields_ = [("instance_id", c.c_uint32), ("name", c.c_char_p), ("artifact", RawArtifactId)]
 
     def into_instance_spec(self) -> InstanceSpec:
         """Converts c-like artifact id into python-friendly form."""
         name = str(c.string_at(self.name), "utf-8")
         artifact_id = self.artifact.into_artifact_id()
 
-        return InstanceSpec(name, artifact_id)
+        instance_id = InstanceId(self.instance_id)
+
+        return InstanceSpec(instance_id, name, artifact_id)
 
     @classmethod
     def from_instance_spec(cls, instance_spec: InstanceSpec) -> "RawInstanceSpec":
         """Converts python version of ArtifactID into c-compatible."""
         raw_artifact = RawArtifactId.from_artifact_id(instance_spec.artifact)
-        return cls(name=instance_spec.name, artifact=raw_artifact)
+        return cls(instance_id=int(instance_spec.instance_id), name=instance_spec.name, artifact=raw_artifact)
 
 
 class RawInstanceDescriptor(c.Structure):
@@ -84,9 +86,9 @@ class RawInstanceDescriptor(c.Structure):
     def into_instance_descriptor(self) -> InstanceDescriptor:
         """Converts c-like artifact id into python-friendly form."""
         name = str(c.string_at(self.name), "utf-8")
-        instance_id = self.instance_id
+        instance_id = InstanceId(self.instance_id)
 
-        return InstanceDescriptor(id=instance_id, name=name)
+        return InstanceDescriptor(instance_id, name)
 
 
 class RawCallInfo(c.Structure):

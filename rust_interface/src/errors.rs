@@ -18,6 +18,9 @@ pub enum PythonRuntimeResult {
     /// Error occured during deployment process.
     ServiceInstallFailed = 17,
 
+    /// Request to the unknown service.
+    UnknownService = 18,
+
     /// Undefined kind of runtime error.
     /// Receiving that kind of error probably means that something wrong with runtime implementation.
     Other = 64,
@@ -64,6 +67,9 @@ impl PythonRuntimeResult {
             }
             code if code == Self::ServiceInstallFailed as u8 => {
                 (&runtime_error, "Service installation failed".into())
+            }
+            code if code == Self::UnknownService as u8 => {
+                (&runtime_error, "Request to an unknown service".into())
             }
 
             // Reserved error codes on the Python side.

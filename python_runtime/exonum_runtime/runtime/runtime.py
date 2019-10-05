@@ -1,7 +1,7 @@
 """TODO"""
 
 import asyncio
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple, Union
 import os
 import sys
 
@@ -10,9 +10,11 @@ from exonum_runtime.ffi.ffi_provider import RustFFIProvider
 from exonum_runtime.ffi.merkledb import MerkledbFFI
 from exonum_runtime.proto import PythonArtifactSpec, ParseError
 from exonum_runtime.interfaces import Named
+from exonum_runtime.crypto import Hash
 
 from exonum_runtime.merkledb.schema import Schema, WithSchema
 from exonum_runtime.merkledb.indices import ProofMapIndex
+from exonum_runtime.merkledb.types import Fork, Snapshot
 
 from .artifact import Artifact
 from .types import (
@@ -26,18 +28,13 @@ from .types import (
     ArtifactProtobufSpec,
     ExecutionContext,
     RawIndexAccess,
+    InstanceId,
 )
 from .config import Configuration
 from .runtime_api import RuntimeApi
 from .runtime_interface import RuntimeInterface
-
-
-class Instance:
-    """TODO"""
-
-    def __init__(self, instance_spec: InstanceSpec):
-        self._name = instance_spec.name
-        self._artifact = instance_spec.artifact
+from .service import Service, ServiceError, GenericServiceError
+from .transaction_context import TransactionContext
 
 
 class PythonRuntimeSchema(Schema):
@@ -59,7 +56,9 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         self._merkledb_ffi = MerkledbFFI(self._rust_ffi._rust_interface)
         self._pending_deployments: Dict[ArtifactId, Artifact] = {}
         self._artifacts: Dict[ArtifactId, Artifact] = {}
-        self._instances: Dict[InstanceSpec, Instance] = {}
+        # Temporary buffer for started but not yet initialized services
+        self._started_services: Dict[InstanceId, Tuple[Artifact, InstanceSpec]] = {}
+        self._instances: Dict[InstanceId, Service] = {}
 
         # TODO
         self._runtime_api = RuntimeApi(port=8080)
@@ -125,27 +124,143 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         return artifact_id in self._artifacts
 
     def start_instance(self, instance_spec: InstanceSpec) -> PythonRuntimeResult:
-        raise NotImplementedError
+        artifact_id = instance_spec.artifact
+        if self.is_artifact_deployed(artifact_id):
+            return PythonRuntimeResult.UNKNOWN_SERVICE
+
+        artifact = self._artifacts[artifact_id]
+        self._started_services[instance_spec.instance_id] = (artifact, instance_spec)
+
+        return PythonRuntimeResult.OK
 
     def initialize_service(
         self, access: RawIndexAccess, instance: InstanceDescriptor, parameters: bytes
-    ) -> PythonRuntimeResult:
-        raise NotImplementedError
+    ) -> Union[PythonRuntimeResult, ServiceError]:
+        instance_id = instance.instance_id
+        if instance_id not in self._started_services:
+            # Service is attempted to initialize but not started.
+            return PythonRuntimeResult.UNKNOWN_SERVICE
+
+        fork = Fork(access)
+        try:
+            artifact, instance_spec = self._started_services[instance_id]
+            del self._started_services[instance_id]
+
+            service_class = artifact.get_service()
+            service_instance = service_class(artifact.spec.service_library_name, fork, instance_spec.name, parameters)
+
+            self._instances[instance_id] = service_instance
+
+            return PythonRuntimeResult.OK
+        except ServiceError as error:
+            # Services are allowed to raise ServiceError to indicate that input data isn't valid.
+            return error
+        # Services are untrusted code, so we have to supress all the exceptions.
+        except Exception:  # pylint: disable=broad-except
+            # Indicate that service isn't OK.
+            return ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
 
     def stop_service(self, instance: InstanceDescriptor) -> PythonRuntimeResult:
-        raise NotImplementedError
+        instance_id = instance.instance_id
 
-    def execute(self, context: ExecutionContext, call_info: CallInfo, arguments: bytes) -> PythonRuntimeResult:
-        raise NotImplementedError
+        if instance_id not in self._instances:
+            return PythonRuntimeResult.UNKNOWN_SERVICE
+
+        self._stop_service(instance_id)
+
+        return PythonRuntimeResult.OK
+
+    def _stop_service(self, instance_id: InstanceId) -> None:
+        try:
+            self._instances[instance_id].stop()
+        # Services are untrusted code, so we have to supress all the exceptions.
+        except Exception:  # pylint: disable=broad-except
+            # If service didn't stop successfully, we don't care. We're removing it anyway.
+            pass
+
+        del self._instances[instance_id]
+
+    def execute(
+        self, context: ExecutionContext, call_info: CallInfo, arguments: bytes
+    ) -> Union[PythonRuntimeResult, ServiceError]:
+        instance_id = call_info.instance_id
+
+        if instance_id not in self._instances:
+            return PythonRuntimeResult.UNKNOWN_SERVICE
+
+        fork = Fork(context.access)
+        transaction_context = TransactionContext(fork, context.caller)
+
+        try:
+            self._instances[instance_id].execute(transaction_context, call_info.method_id, arguments)
+
+            return PythonRuntimeResult.OK
+        except ServiceError as error:
+            # Services are allowed to raise ServiceError to indicate that input data isn't valid.
+            return error
+        # Services are untrusted code, so we have to supress all the exceptions.
+        except Exception:  # pylint: disable=broad-except
+            # Indicate that service isn't OK and remove it from the running instances.
+            self._stop_service(instance_id)
+            return ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
 
     def artifact_protobuf_spec(self, artifact: ArtifactId) -> Optional[ArtifactProtobufSpec]:
-        raise NotImplementedError
+        if not self.is_artifact_deployed(artifact):
+            return None
+
+        try:
+            sources = self._artifacts[artifact].get_service().proto_sources()
+        except Exception:  # pylint: disable=broad-except
+            return None
+
+        # Check that service returned what we've expected.
+        if not isinstance(sources, ArtifactProtobufSpec):
+            return None
+
+        return sources
 
     def state_hashes(self, access: RawIndexAccess) -> StateHashAggregator:
-        raise NotImplementedError
+
+        snapshot = Snapshot(access)
+        runtime = self.get_state_hashes(snapshot)
+
+        instances = []
+
+        for instance_id, instance in self._instances.items():
+            try:
+                state_hashes = instance.state_hashes(snapshot)
+            except Exception:  # pylint: disable=broad-except
+                # Remove service from the running instances and skip it.
+                self._stop_service(instance_id)
+                continue
+
+            # Check that service returned what we expected.
+            if not isinstance(state_hashes, list) or not all(map(lambda x: isinstance(x, Hash), state_hashes)):
+                self._stop_service(instance_id)
+                continue
+
+            instances.append((instance_id, state_hashes))
+
+        return StateHashAggregator(runtime, instances)
 
     def before_commit(self, access: RawIndexAccess) -> None:
-        raise NotImplementedError
+        fork = Fork(access)
+
+        for instance_id, instance in self._instances.items():
+            try:
+                instance.before_commit(fork)
+            except Exception:  # pylint: disable=broad-except
+                # Remove service from the running instances and skip it.
+                self._stop_service(instance_id)
+                continue
 
     def after_commit(self, access: RawIndexAccess) -> None:
-        raise NotImplementedError
+        snapshot = Snapshot(access)
+
+        for instance_id, instance in self._instances.items():
+            try:
+                instance.after_commit(snapshot)
+            except Exception:  # pylint: disable=broad-except
+                # Remove service from the running instances and skip it.
+                self._stop_service(instance_id)
+                continue

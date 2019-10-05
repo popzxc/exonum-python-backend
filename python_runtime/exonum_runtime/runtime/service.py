@@ -15,10 +15,6 @@ from .types import ArtifactProtobufSpec
 from .transaction_context import TransactionContext
 
 
-class _ServiceMeta(abc.ABCMeta):
-    """Metaclass defining the Service internal structure."""
-
-
 class GenericServiceError(IntEnum):
     """Enum denoting generic service errors."""
 
@@ -57,7 +53,7 @@ class _TransactionRoute(NamedTuple):
     deserializer: str
 
 
-class Service(Named, metaclass=_ServiceMeta):
+class Service(Named, metaclass=abc.ABCMeta):
     """Base interface for every Exonum Python service.
 
     Prerequirements:
@@ -78,6 +74,10 @@ class Service(Named, metaclass=_ServiceMeta):
     Errors raised by subclass of `Service` must be derived from `ServiceError`. Raising an error which is
     not derived from `ServiceError` will be considered an error in the service implementation, and such
     a service will be disabled.
+    Please note that raising `ServiceError` is allowed only when some input data is provided, namely in
+    the `initialize` and `execute` methods. All the other methods aren't allowed to raise any kind of
+    exception, so you have to handle it by yourself.
+
 
     Example of service:
 
@@ -135,6 +135,10 @@ class Service(Named, metaclass=_ServiceMeta):
         Config will be deserialized automatically. It supposes Config structure to be
         defined as the `Config` message in `service.proto`.
         """
+
+    def stop(self) -> None:
+        """Method called before the service stopping, so service instance can shut down
+        gracefully."""
 
     @classmethod
     @abc.abstractclassmethod

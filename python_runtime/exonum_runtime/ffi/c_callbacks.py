@@ -16,6 +16,8 @@ from .raw_types import (
 )
 from .ffi_provider import RustFFIProvider
 
+from exonum_runtime.runtime.types import PythonRuntimeResult
+
 # Dynamically allocated resources
 #
 # Resources are freed by the rust through a `free` method call.
@@ -70,7 +72,11 @@ def initialize_service(access, descriptor, parameters, parameters_len):  # type:
 
     result = ffi.runtime().initialize_service(access, instance_descriptor, parameters_bytes)
 
-    return result.value
+    if isinstance(result, PythonRuntimeResult):
+        return result.value
+
+    # ServiceError
+    return PythonRuntimeResult.SERVICE_ERRORS_START + result.code
 
 
 @c.CFUNCTYPE(c.c_uint8, RawInstanceDescriptor)
@@ -98,7 +104,11 @@ def execute(raw_call_info, raw_context, parameters, parameters_len):  # type: ig
 
     result = ffi.runtime().execute(context, call_info, parameters_bytes)
 
-    return result.value
+    if isinstance(result, PythonRuntimeResult):
+        return result.value
+
+    # ServiceError
+    return PythonRuntimeResult.SERVICE_ERRORS_START + result.code
 
 
 @c.CFUNCTYPE(None, c.POINTER(c.POINTER(RawStateHashAggregator)))

@@ -28,6 +28,10 @@ class PythonRuntimeResult(IntEnum):
     # Errors emitted by the python side
     WRONG_SPEC = 16
     SERVICE_INSTALL_FAILED = 17
+    UNKNOWN_SERVICE = 18
+
+    # Service errors are lying in range from 65 to 65 + 128
+    SERVICE_ERRORS_START = 65
 
 
 class ArtifactId(NamedTuple):
@@ -37,15 +41,16 @@ class ArtifactId(NamedTuple):
     name: str
 
 
+InstanceId = NewType("InstanceId", int)
+MethodId = NewType("MethodId", int)
+
+
 class InstanceSpec(NamedTuple):
     """Structure that represents an Instance Spec"""
 
+    instance_id: InstanceId
     name: str
     artifact: ArtifactId
-
-
-InstanceId = NewType("InstanceId", int)
-MethodId = NewType("MethodId", int)
 
 
 class DeploymentResult(NamedTuple):
@@ -58,7 +63,7 @@ class DeploymentResult(NamedTuple):
 class InstanceDescriptor(NamedTuple):
     """Service Instance descriptor."""
 
-    id: InstanceId
+    instance_id: InstanceId
     name: str
 
 

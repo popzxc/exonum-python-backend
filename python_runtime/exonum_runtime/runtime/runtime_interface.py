@@ -1,6 +1,6 @@
 """Interface for a runtime."""
 
-from typing import Optional
+from typing import Optional, Union
 import abc
 
 from .types import (
@@ -14,6 +14,8 @@ from .types import (
     ExecutionContext,
     RawIndexAccess,
 )
+
+from .service import ServiceError
 
 
 class RuntimeInterface(metaclass=abc.ABCMeta):
@@ -34,7 +36,7 @@ class RuntimeInterface(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def initialize_service(
         self, access: RawIndexAccess, instance: InstanceDescriptor, parameters: bytes
-    ) -> PythonRuntimeResult:
+    ) -> Union[PythonRuntimeResult, ServiceError]:
         """Initialize the instance."""
 
     @abc.abstractmethod
@@ -42,7 +44,9 @@ class RuntimeInterface(metaclass=abc.ABCMeta):
         """Stop the service instance."""
 
     @abc.abstractmethod
-    def execute(self, context: ExecutionContext, call_info: CallInfo, arguments: bytes) -> PythonRuntimeResult:
+    def execute(
+        self, context: ExecutionContext, call_info: CallInfo, arguments: bytes
+    ) -> Union[PythonRuntimeResult, ServiceError]:
         """Execute the transaction."""
 
     @abc.abstractmethod

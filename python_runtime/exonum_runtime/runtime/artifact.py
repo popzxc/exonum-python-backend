@@ -12,7 +12,7 @@ from .config import Configuration
 from .service import Service
 
 
-class ArtifactStartError(Exception):
+class ArtifactLoadError(Exception):
     """Error to be raised when already deployed artifact can't be loaded."""
 
 
@@ -22,8 +22,8 @@ class Artifact:
     def __init__(
         self, artifact_id: ArtifactId, spec: PythonArtifactSpec, config: Configuration, already_deployed: bool = False
     ):
+        self.spec = spec
         self._id = artifact_id
-        self._spec = spec
         self._config = config
         self._service_class: Optional[Type[Service]] = None if not already_deployed else self._get_service_class()
 
@@ -33,7 +33,7 @@ class Artifact:
         in_dir = self._config.artifacts_sources_folder
         out_dir = self._config.built_sources_folder
 
-        tarball_path = os.path.join(in_dir, self._spec.source_wheel_name)
+        tarball_path = os.path.join(in_dir, self.spec.source_wheel_name)
 
         # Install module using pip.
         install_command = " ".join([sys.executable, "-m", "pip", "install", tarball_path, "--target", out_dir])
@@ -53,7 +53,7 @@ class Artifact:
 
         # Try to import service library.
         try:
-            service_module = importlib.import_module(self._spec.service_library_name)
+            service_module = importlib.import_module(self.spec.service_library_name)
         except (ModuleNotFoundError, ImportError):
             result = DeploymentResult(result=PythonRuntimeResult.SERVICE_INSTALL_FAILED, artifact_id=self._id)
 
@@ -62,7 +62,7 @@ class Artifact:
 
         # Try to get service class.
         try:
-            service = getattr(service_module, self._spec.service_class_name)
+            service = getattr(service_module, self.spec.service_class_name)
 
             if not issubclass(service, Service):
                 raise ValueError("Not a Service subclass")
@@ -86,12 +86,12 @@ class Artifact:
 
     def _get_service_class(self) -> Type[Service]:
         try:
-            service_module = importlib.import_module(self._spec.service_library_name)
-            service = getattr(service_module, self._spec.service_class_name)
+            service_module = importlib.import_module(self.spec.service_library_name)
+            service = getattr(service_module, self.spec.service_class_name)
 
             if not issubclass(service, Service):
                 raise ValueError("Not a Service subclass")
 
             return service
         except (ModuleNotFoundError, ImportError, ValueError, AttributeError):
-            raise ArtifactStartError()
+            raise ArtifactLoadError()
