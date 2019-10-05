@@ -14,6 +14,9 @@ from .runtime import PythonRuntime
 
 def main() -> None:
     """Starts the Exonum Python Runtime."""
+
+    # TODO check if `protoc` is installed.
+
     config_path = parse_args()
 
     loop = asyncio.get_event_loop()

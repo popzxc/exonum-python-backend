@@ -11,7 +11,12 @@ RawIndexAccess = c.c_void_p
 
 
 class PythonRuntimeResult(IntEnum):
-    """Common runtime errors."""
+    """Common runtime errors.
+    
+    0 means OK
+    1-15 are reserved for Rust side of Python runtime.
+    16-64 are reserved for Python side runtime.
+    65-... are errors of the Services."""
 
     # Ok result.
     OK = 0
