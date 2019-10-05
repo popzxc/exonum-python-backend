@@ -5,7 +5,7 @@ use std::sync::RwLock;
 use exonum::runtime::ArtifactId;
 
 use super::{
-    errors::PythonRuntimeError,
+    errors::PythonRuntimeResult,
     pending_deployment::PendingDeployment,
     types::{
         RawArtifactId, RawArtifactProtobufSpec, RawCallInfo, RawExecutionContext, RawIndexAccess,
@@ -33,35 +33,26 @@ impl PythonRuntimeInterface {
     ) {
         self.ongoing_deployments.insert(artifact, deployment);
     }
-
-    pub fn error_code_to_result(code: u32) -> Result<(), PythonRuntimeError> {
-        let error = match code {
-            0 => return Ok(()),
-            _ => PythonRuntimeError::from_value(code),
-        };
-
-        Err(error)
-    }
 }
 
 // Types of the stored functions.
 type PythonDeployArtifactMethod =
-    unsafe extern "C" fn(artifact: RawArtifactId, spec: *const u8, spec_len: u64) -> u32;
+    unsafe extern "C" fn(artifact: RawArtifactId, spec: *const u8, spec_len: u64) -> u8;
 type PythonIsArtifactDeployedMethod = unsafe extern "C" fn(artifact: RawArtifactId) -> bool;
-type PythonStartServiceMethod = unsafe extern "C" fn(spec: RawInstanceSpec) -> u32;
+type PythonStartServiceMethod = unsafe extern "C" fn(spec: RawInstanceSpec) -> u8;
 type PythonInitializeServiceMethod = unsafe extern "C" fn(
     fork: *const RawIndexAccess,
     descriptor: RawInstanceDescriptor,
     parameters: *const u8,
     parameters_len: u64,
-) -> u32;
-type PythonStopServiceMethod = unsafe extern "C" fn(descriptor: RawInstanceDescriptor) -> u32;
+) -> u8;
+type PythonStopServiceMethod = unsafe extern "C" fn(descriptor: RawInstanceDescriptor) -> u8;
 type PythonExecuteMethod = unsafe extern "C" fn(
     context: RawExecutionContext,
     call_info: RawCallInfo,
     payload: *const u8,
     payload_len: u32,
-) -> u32;
+) -> u8;
 type PythonArtifactProtobufSpecMethod =
     unsafe extern "C" fn(_id: RawArtifactId, _spec: *const *mut RawArtifactProtobufSpec);
 type PythonStateHashesMethod = unsafe extern "C" fn(
@@ -125,19 +116,19 @@ pub unsafe extern "C" fn init_python_side(methods: *const PythonMethods) {
 /// Removes an artifact from the pending deployments.
 /// This function is meant to be called by the python after the deployment of the artifact.
 #[no_mangle]
-fn deployment_completed(python_artifact: RawArtifactId, result: u32) {
+fn deployment_completed(python_artifact: RawArtifactId, result: u8) {
     let artifact = ArtifactId::from(python_artifact);
     let mut python_interface = PYTHON_INTERFACE.write().expect("Excepted write");
 
     let future = python_interface.ongoing_deployments.remove(&artifact);
 
     match future {
-        Some(mut f) => match PythonRuntimeInterface::error_code_to_result(result) {
+        Some(mut f) => match PythonRuntimeResult::from_value(result) {
             Ok(()) => {
                 f.complete();
             }
             Err(error) => {
-                f.error(error.into());
+                f.error(error);
             }
         },
         None => {
@@ -155,16 +146,16 @@ unsafe extern "C" fn default_deploy(
     _artifact: RawArtifactId,
     _spec: *const u8,
     _spec_len: u64,
-) -> u32 {
-    PythonRuntimeError::RuntimeNotReady as u32
+) -> u8 {
+    PythonRuntimeResult::RuntimeNotReady as u8
 }
 
 unsafe extern "C" fn default_is_artifact_deployed(_artifact: RawArtifactId) -> bool {
     false
 }
 
-unsafe extern "C" fn default_start_service(_spec: RawInstanceSpec) -> u32 {
-    PythonRuntimeError::RuntimeNotReady as u32
+unsafe extern "C" fn default_start_service(_spec: RawInstanceSpec) -> u8 {
+    PythonRuntimeResult::RuntimeNotReady as u8
 }
 
 unsafe extern "C" fn default_initialize_service_method(
@@ -172,12 +163,12 @@ unsafe extern "C" fn default_initialize_service_method(
     _descriptor: RawInstanceDescriptor,
     _parameters: *const u8,
     _parameters_len: u64,
-) -> u32 {
-    PythonRuntimeError::RuntimeNotReady as u32
+) -> u8 {
+    PythonRuntimeResult::RuntimeNotReady as u8
 }
 
-unsafe extern "C" fn default_stop_service_method(_descriptor: RawInstanceDescriptor) -> u32 {
-    PythonRuntimeError::RuntimeNotReady as u32
+unsafe extern "C" fn default_stop_service_method(_descriptor: RawInstanceDescriptor) -> u8 {
+    PythonRuntimeResult::RuntimeNotReady as u8
 }
 
 unsafe extern "C" fn default_execute_method(
@@ -185,8 +176,8 @@ unsafe extern "C" fn default_execute_method(
     _call_info: RawCallInfo,
     _payload: *const u8,
     _payload_len: u32,
-) -> u32 {
-    PythonRuntimeError::RuntimeNotReady as u32
+) -> u8 {
+    PythonRuntimeResult::RuntimeNotReady as u8
 }
 unsafe extern "C" fn default_artifact_protobuf_spec_method(
     _id: RawArtifactId,

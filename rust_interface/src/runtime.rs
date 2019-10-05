@@ -16,9 +16,9 @@ use exonum::{
 use exonum_merkledb::{Fork, Snapshot};
 
 use super::{
-    errors::PythonRuntimeError,
+    errors::PythonRuntimeResult,
     pending_deployment::PendingDeployment,
-    python_interface::{PythonRuntimeInterface, PYTHON_INTERFACE},
+    python_interface::PYTHON_INTERFACE,
     types::{
         into_ptr_and_len, RawArtifactId, RawArtifactProtobufSpec, RawCallInfo, RawExecutionContext,
         RawIndexAccess, RawInstanceDescriptor, RawInstanceSpec, RawStateHashAggregator,
@@ -51,13 +51,17 @@ impl PythonRuntime {
 
         system.refresh_process(self.process_pid);
 
+        // Closure for lazy evaluation.
+        let runtime_dead_err =
+            || PythonRuntimeResult::from_value(PythonRuntimeResult::RuntimeDead as u8);
+
         let process = system
             .get_process(self.process_pid)
-            .ok_or_else(|| ExecutionError::from(PythonRuntimeError::RuntimeDead))?;
+            .ok_or_else(|| runtime_dead_err().unwrap_err())?;
 
         match process.status() {
             ProcessStatus::Run => Ok(()),
-            _ => Err(ExecutionError::from(PythonRuntimeError::RuntimeDead)),
+            _ => runtime_dead_err(),
         }
     }
 }
@@ -87,7 +91,7 @@ impl Runtime for PythonRuntime {
         };
 
         // Look at the result.
-        match PythonRuntimeInterface::error_code_to_result(result) {
+        match PythonRuntimeResult::from_value(result) {
             Ok(()) => {
                 // Everything is ok, deployment started, create a future and return it.
                 let deployment_future = PendingDeployment::new();
@@ -98,7 +102,7 @@ impl Runtime for PythonRuntime {
             }
             Err(error) => {
                 // Something went wrong on the initial stage, did not even stert.
-                Box::new(Err(error.into()).into_future())
+                Box::new(Err(error).into_future())
             }
         }
     }
@@ -127,7 +131,7 @@ impl Runtime for PythonRuntime {
             (python_interface.methods.start_service)(python_instance_spec)
         };
 
-        PythonRuntimeInterface::error_code_to_result(result).map_err(From::from)
+        PythonRuntimeResult::from_value(result)
     }
 
     fn initialize_service(
@@ -155,7 +159,7 @@ impl Runtime for PythonRuntime {
             )
         };
 
-        PythonRuntimeInterface::error_code_to_result(result).map_err(From::from)
+        PythonRuntimeResult::from_value(result)
     }
 
     fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
@@ -170,7 +174,7 @@ impl Runtime for PythonRuntime {
             (python_interface.methods.stop_service)(python_instance_descriptor)
         };
 
-        PythonRuntimeInterface::error_code_to_result(result).map_err(From::from)
+        PythonRuntimeResult::from_value(result)
     }
 
     fn execute(
@@ -202,7 +206,7 @@ impl Runtime for PythonRuntime {
             )
         };
 
-        PythonRuntimeInterface::error_code_to_result(result).map_err(From::from)
+        PythonRuntimeResult::from_value(result)
     }
 
     fn artifact_protobuf_spec(&self, id: &ArtifactId) -> Option<ArtifactProtobufSpec> {

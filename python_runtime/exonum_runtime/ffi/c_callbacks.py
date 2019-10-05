@@ -24,7 +24,7 @@ _RESOURCES: Set[c.c_void_p] = set()
 _MERKLEDB_ALLOCATED: List[Any] = list()
 
 
-@c.CFUNCTYPE(c.c_uint32, RawArtifactId, c.POINTER(c.c_ubyte), c.c_uint64)
+@c.CFUNCTYPE(c.c_uint8, RawArtifactId, c.POINTER(c.c_ubyte), c.c_uint64)
 def deploy_artifact(raw_artifact, raw_data, raw_data_len):  # type: ignore # Signature is one line above.
     """Function called from Rust to indicate an artifact deploy request."""
     artifact_id = raw_artifact.into_artifact_id()
@@ -47,7 +47,7 @@ def is_artifact_deployed(raw_artifact):  # type: ignore # Signature is one line 
     return ffi.runtime().is_artifact_deployed(artifact_id)
 
 
-@c.CFUNCTYPE(c.c_uint32, RawInstanceSpec)
+@c.CFUNCTYPE(c.c_uint8, RawInstanceSpec)
 def start_service(raw_spec):  # type: ignore # Signature is one line above.
     """Function called from Rust to indicate an service start request."""
     instance_spec = raw_spec.into_instance_spec()
@@ -59,7 +59,7 @@ def start_service(raw_spec):  # type: ignore # Signature is one line above.
     return result.result.value
 
 
-@c.CFUNCTYPE(c.c_uint32, RawIndexAccess, RawInstanceDescriptor, c.POINTER(c.c_uint8), c.c_uint32)
+@c.CFUNCTYPE(c.c_uint8, RawIndexAccess, RawInstanceDescriptor, c.POINTER(c.c_uint8), c.c_uint32)
 def initialize_service(access, descriptor, parameters, parameters_len):  # type: ignore # Signature is one line above.
     """Configure service instance"""
     instance_descriptor = descriptor.into_instance_descriptor()
@@ -73,7 +73,7 @@ def initialize_service(access, descriptor, parameters, parameters_len):  # type:
     return result.value
 
 
-@c.CFUNCTYPE(c.c_uint32, RawInstanceDescriptor)
+@c.CFUNCTYPE(c.c_uint8, RawInstanceDescriptor)
 def stop_service(descriptor):  # type: ignore # Signature is one line above.
     """Stop service instance"""
     instance_descriptor = descriptor.into_instance_descriptor()
@@ -85,7 +85,7 @@ def stop_service(descriptor):  # type: ignore # Signature is one line above.
     return result.value
 
 
-@c.CFUNCTYPE(c.c_uint32, RawExecutionContext, RawCallInfo, c.POINTER(c.c_uint8), c.c_uint32)
+@c.CFUNCTYPE(c.c_uint8, RawExecutionContext, RawCallInfo, c.POINTER(c.c_uint8), c.c_uint32)
 def execute(raw_call_info, raw_context, parameters, parameters_len):  # type: ignore # Signature is one line above.
     """Execute a transaction."""
     call_info = raw_call_info.into_call_info()
