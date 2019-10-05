@@ -1,5 +1,5 @@
 """Common types for python runtime."""
-from typing import NamedTuple, NewType, Tuple, List, Union
+from typing import NamedTuple, NewType, Tuple, List, Union, Optional
 from enum import IntEnum
 
 import ctypes as c
@@ -113,6 +113,20 @@ class Caller(NamedTuple):
     """TODO"""
 
     caller: Union[CallerTransaction, CallerService]
+
+    def as_transaction(self) -> Optional[CallerTransaction]:
+        """Tries to convert self into CallerTransaction."""
+        if isinstance(self.caller, CallerTransaction):
+            return self.caller
+
+        return None
+
+    def as_sertice(self) -> Optional[CallerService]:
+        """Tries to convert self into CallerService."""
+        if isinstance(self, CallerService):
+            return self.caller
+
+        return None
 
 
 class ExecutionContext(NamedTuple):
