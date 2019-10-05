@@ -30,8 +30,21 @@ class MapIndex(BaseIndex):
 
         return None
 
-    def __getitem__(self, key: IntoBytes) -> Optional[IntoBytes]:
+    def __getitem__(self, key: IntoBytes) -> IntoBytes:
+        value = self.get(key)
+
+        if value is None:
+            raise KeyError(f"KeyError: {key}")
+
+        return value
+
+    def get(self, key: IntoBytes, default: Optional[IntoBytes] = None) -> Optional[IntoBytes]:
+        """Returns the value assotiated with provided key, or `default` value if there is
+        no such key in the map."""
         value = self._index.get(key.into_bytes())
+
+        if value is None:
+            return default
 
         return self._value_from_bytes(value)
 
