@@ -24,6 +24,10 @@ lazy_static! {
         RwLock::new(Default::default());
 }
 
+// Constant object that will be used by python side that
+// it wants to access database to process API request.
+const SNAPSHOT_TOKEN: RawIndexAccess = RawIndexAccess::SnapshotToken;
+
 #[derive(Debug, Default)]
 pub struct PythonRuntimeInterface {
     pub methods: PythonMethods,
@@ -93,6 +97,9 @@ impl std::fmt::Debug for PythonMethods {
 }
 
 impl Default for PythonMethods {
+    // By default we have blank implementations of the functions.
+    // When Python side will be initialized, it will provide actual
+    // methods.
     fn default() -> Self {
         Self {
             deploy_artifact: default_deploy,
@@ -144,6 +151,12 @@ fn deployment_completed(python_artifact: RawArtifactId, result: u8) {
             );
         }
     }
+}
+
+/// Returns a pointer to the Snapshot token for API requests.
+#[no_mangle]
+pub unsafe extern "C" fn get_snapshot_token() -> *const RawIndexAccess<'static> {
+    &SNAPSHOT_TOKEN as *const RawIndexAccess
 }
 
 // Blank implementations to avoid storing `Option`.

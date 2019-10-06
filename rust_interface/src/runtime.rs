@@ -1,40 +1,38 @@
 use std::os::raw::c_void;
 use std::process::Child;
-use std::sync::Arc;
+use std::sync::RwLock;
 
 use futures::{Future, IntoFuture};
 use sysinfo::{Pid, ProcessExt, ProcessStatus, RefreshKind, System, SystemExt};
 
 use exonum::{
+    api::ApiContext,
     crypto::{PublicKey, SecretKey},
     node::ApiSender,
     runtime::{
         dispatcher::{DispatcherRef, DispatcherSender},
-        ApiChange, ApiContext, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext,
-        ExecutionError, InstanceDescriptor, InstanceSpec, Runtime, StateHashAggregator,
+        ApiChange, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
+        InstanceDescriptor, InstanceSpec, Runtime, StateHashAggregator,
     },
 };
-use exonum_merkledb::{Database, Fork, Snapshot};
+use exonum_merkledb::{Fork, Snapshot};
 
 use super::{
     errors::PythonRuntimeResult,
     pending_deployment::PendingDeployment,
-    python_interface::PYTHON_INTERFACE,
+    python_interface::{BLOCK_SNAPSHOT, PYTHON_INTERFACE},
     types::{
         into_ptr_and_len, RawArtifactId, RawArtifactProtobufSpec, RawCallInfo, RawExecutionContext,
         RawIndexAccess, RawInstanceDescriptor, RawInstanceSpec, RawStateHashAggregator,
     },
 };
 
-// TODO provide it to python
-const SNAPSHOT_TOKEN: RawIndexAccess = RawIndexAccess::SnapshotToken;
-
 /// Sample runtime.
 #[derive(Debug)]
 pub struct PythonRuntime {
     python_process: Child,
     process_pid: Pid,
-    database: Option<Arc<Database>>,
+    api_context: RwLock<Option<ApiContext>>,
 }
 
 impl PythonRuntime {
@@ -47,7 +45,7 @@ impl PythonRuntime {
         Self {
             python_process,
             process_pid,
-            database: None,
+            api_context: RwLock::new(None),
         }
     }
 
@@ -308,6 +306,14 @@ impl Runtime for PythonRuntime {
             return;
         }
 
+        // Update the stored snapshot.
+        if let Some(ref api_context) = self.api_context.read().expect("Database read").as_ref() {
+            let mut snapshot = BLOCK_SNAPSHOT.write().expect("Block snapshot write");
+            *snapshot = Some(api_context.snapshot());
+        }
+
+        // Call `after_commit` on the python side.
+
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
         unsafe {
@@ -318,9 +324,12 @@ impl Runtime for PythonRuntime {
     }
 
     fn notify_api_changes(&self, context: &ApiContext, _changes: &[ApiChange]) {
-        if self.database.is_none() {
-            // TODO
-            // self.
+        // If we've not received a context yet, store it
+        // so API calls will be able to get a snapshot.
+        if self.api_context.read().expect("Database read").is_none() {
+            let mut api_context = self.api_context.write().expect("Database write");
+
+            *api_context = Some(context.clone());
         }
     }
 }
