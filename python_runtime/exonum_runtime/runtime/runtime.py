@@ -5,16 +5,22 @@ from typing import Dict, Optional, Tuple, Union, List
 import os
 import sys
 
-from exonum_runtime.ffi.c_callbacks import build_callbacks
-from exonum_runtime.ffi.ffi_provider import RustFFIProvider
-from exonum_runtime.ffi.merkledb import MerkledbFFI
+# Uncategorized imports
+from exonum_runtime.api.runtime_api import RuntimeApi, RuntimeApiConfig
 from exonum_runtime.proto import PythonArtifactSpec, ParseError
 from exonum_runtime.interfaces import Named
 from exonum_runtime.crypto import Hash
 
+# FFI
+from exonum_runtime.ffi.c_callbacks import build_callbacks
+from exonum_runtime.ffi.ffi_provider import RustFFIProvider
+from exonum_runtime.ffi.merkledb import MerkledbFFI
+
+# Merkledb
 from exonum_runtime.merkledb.schema import WithSchema
 from exonum_runtime.merkledb.types import Fork, Snapshot
 
+# Runtime
 from .artifact import Artifact
 from .types import (
     ArtifactId,
@@ -30,7 +36,6 @@ from .types import (
     InstanceId,
 )
 from .config import Configuration
-from .runtime_api import RuntimeApi, RuntimeApiConfig
 from .runtime_interface import RuntimeInterface
 from .service import Service
 from .service_error import ServiceError, GenericServiceError
@@ -57,7 +62,8 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
 
         # API section
         api_config = RuntimeApiConfig(artifact_wheels_path=self._configuration.artifacts_sources_folder)
-        self._snapshot_token = self._rust_ffi.snapshot_token()
+        self._api_snapshot = Snapshot(self._rust_ffi.snapshot_token())
+        self._api_snapshot.set_always_valid()
         # TODO
         self._runtime_api = RuntimeApi(port=8090, config=api_config)
 

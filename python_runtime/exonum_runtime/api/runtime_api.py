@@ -10,7 +10,7 @@ import tornado.ioloop
 import tornado.web
 import tornado.platform.asyncio
 import tornado.httpclient
-from tornado.escape import json_decode, json_encode
+from tornado.escape import json_encode
 
 
 class RuntimeApiConfig(NamedTuple):
@@ -23,13 +23,12 @@ class RuntimeApiConfig(NamedTuple):
 # pylint: disable=abstract-method
 
 
-class _ReqHandler(tornado.web.RequestHandler):
+class _State(tornado.web.RequestHandler):
     async def get(self) -> None:
-        """Get handler."""
-        query = self.request.query
+        """State handler."""
 
-        print(query)
-        self.write({"message": "hello world!"})
+        # TODO provide more helpful information
+        self.write({"state": "operating"})
 
 
 class _Artifact(tornado.web.RequestHandler):
@@ -94,7 +93,7 @@ class RuntimeApi:
         self._config = config
 
         self._app = tornado.web.Application(
-            [(r"/", _ReqHandler, dict(config=config)), (r"/artifacts", _Artifact, dict(config=config))]
+            [(r"/", _State, dict(config=config)), (r"/artifacts", _Artifact, dict(config=config))]
         )
 
         self._app.listen(port)

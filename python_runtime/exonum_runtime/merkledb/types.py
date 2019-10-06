@@ -20,6 +20,10 @@ class Access:
     def __exit__(self, exc_type: Optional[type], exc_value: Optional[Any], exc_traceback: Optional[object]) -> None:
         self._valid = False
 
+    def set_always_valid(self) -> None:
+        """Marks Access as always valid (meaning that with kind of Access database can be accessed anytime)"""
+        self._valid = True
+
     def valid(self) -> bool:
         """Returns True if access is valid and can be used."""
         return self._valid
