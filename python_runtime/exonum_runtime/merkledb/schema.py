@@ -155,6 +155,14 @@ class WithSchema(metaclass=_WithSchemaMeta):
 
         return state_hashes
 
+    @classmethod
+    def schema(cls, owner: Union[Named, str], access: Access) -> Schema:
+        """Gets the Schema assotiated with that service."""
+        assert cls._schema_ is not None, "Attempt to call `schema()` on class without schema"
+
+        # pylint: disable=not-callable
+        return cls._schema_(owner, access)
+
 
 class _SchemaMeta(abc.ABCMeta):
     """Metaclass for Schema class.
@@ -248,9 +256,14 @@ class Schema(metaclass=_SchemaMeta):
 
         return getattr(cls, "_schema_meta")[index_name]
 
-    def __init__(self, owner: Named, access: Access):
+    def __init__(self, owner: Union[Named, str], access: Access):
         self._access = access
-        self._owner = owner
+        if isinstance(owner, Named):
+            self._owner = owner.instance_name()
+        elif isinstance(owner, str):
+            self._owner = owner
+        else:
+            raise ValueError(f"Owner must be either an instance of Named or string, but got {owner}")
 
     def __getattribute__(self, name: str) -> Any:
         schema_meta = super().__getattribute__("_schema_meta")
@@ -259,7 +272,7 @@ class Schema(metaclass=_SchemaMeta):
             # create an object of that index and return it.
             index_type = schema_meta[name]
 
-            instance_name = self._owner.instance_name()
+            instance_name = self._owner
             index_name = name
 
             return index_type(self._access, instance_name, index_name)
