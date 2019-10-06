@@ -208,7 +208,8 @@ class _SchemaMeta(abc.ABCMeta):
         annotations = dct.get("__annotations__")
 
         if annotations is None:
-            raise AttributeError("Schema must provide information about used indices")
+            # Empty schema
+            return dict()
 
         return annotations
 

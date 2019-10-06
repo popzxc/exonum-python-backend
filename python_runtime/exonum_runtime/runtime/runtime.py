@@ -30,7 +30,7 @@ from .types import (
     InstanceId,
 )
 from .config import Configuration
-from .runtime_api import RuntimeApi
+from .runtime_api import RuntimeApi, RuntimeApiConfig
 from .runtime_interface import RuntimeInterface
 from .service import Service
 from .service_error import ServiceError, GenericServiceError
@@ -56,9 +56,10 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         self._instances: Dict[InstanceId, Service] = {}
 
         # API section
+        api_config = RuntimeApiConfig(artifact_wheels_path=self._configuration.artifacts_sources_folder)
         self._snapshot_token = self._rust_ffi.snapshot_token()
         # TODO
-        self._runtime_api = RuntimeApi(port=8080)
+        self._runtime_api = RuntimeApi(port=8090, config=api_config)
 
         # Initialization
         self._init_artifacts()
