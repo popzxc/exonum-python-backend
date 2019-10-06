@@ -1,6 +1,6 @@
 """Module representing Artifact."""
 import asyncio
-from typing import Optional, Type
+from typing import Optional, Type, Any
 import os
 import sys
 import importlib
@@ -19,17 +19,57 @@ class ArtifactLoadError(Exception):
 class Artifact:
     """TODO"""
 
-    def __init__(
-        self, artifact_id: ArtifactId, spec: PythonArtifactSpec, config: Configuration, already_deployed: bool = False
-    ):
+    def __init__(self, artifact_id: ArtifactId, spec: PythonArtifactSpec, config: Configuration):
         self.spec = spec
         self._id = artifact_id
         self._config = config
-        self._service_class: Optional[Type[Service]] = None if not already_deployed else self._get_service_class()
+        self._service_class: Optional[Type[Service]] = None
 
     async def deploy(self, future: asyncio.Future) -> None:
         """Performs the deploy process."""
 
+        # Check if service is already deployed
+        try:
+            # Artifact is installed, no actions required.
+            service_class = self._get_service_class()
+            self._service_class = service_class
+            result = DeploymentResult(result=PythonRuntimeResult.OK, artifact_id=self._id)
+            future.set_result(result)
+            return
+        except ArtifactLoadError:
+            # Nope, artifact is not installed, install it.
+            pass
+
+        # Install the tarball
+        install_success = await self._install_tarball()
+
+        if not install_success:
+            result = DeploymentResult(result=PythonRuntimeResult.SERVICE_INSTALL_FAILED, artifact_id=self._id)
+
+            future.set_result(result)
+            return
+
+        # Try to import service library.
+        service_module = self._get_service_module()
+        if service_module is None:
+            result = DeploymentResult(result=PythonRuntimeResult.SERVICE_INSTALL_FAILED, artifact_id=self._id)
+
+            future.set_result(result)
+            return
+
+        # Try to get service class.
+        service = self._get_service_class_from_module(service_module)
+        if service is None:
+            result = DeploymentResult(result=PythonRuntimeResult.SERVICE_INSTALL_FAILED, artifact_id=self._id)
+
+            future.set_result(result)
+            return
+
+        self._service_class = service
+        result = DeploymentResult(result=PythonRuntimeResult.OK, artifact_id=self._id)
+        future.set_result(result)
+
+    async def _install_tarball(self) -> bool:
         in_dir = self._config.artifacts_sources_folder
         out_dir = self._config.built_sources_folder
 
@@ -45,37 +85,25 @@ class Artifact:
         _, _ = await proc.communicate()
 
         # On successfull installation pip should return 0.
-        if proc.returncode != 0:
-            result = DeploymentResult(result=PythonRuntimeResult.SERVICE_INSTALL_FAILED, artifact_id=self._id)
+        return proc.returncode == 0
 
-            future.set_result(result)
-            return
-
-        # Try to import service library.
+    def _get_service_module(self) -> Optional[Any]:
         try:
             service_module = importlib.import_module(self.spec.service_library_name)
+            return service_module
         except (ModuleNotFoundError, ImportError):
-            result = DeploymentResult(result=PythonRuntimeResult.SERVICE_INSTALL_FAILED, artifact_id=self._id)
+            return None
 
-            future.set_result(result)
-            return
-
-        # Try to get service class.
+    def _get_service_class_from_module(self, service_module: Any) -> Optional[Type[Service]]:
         try:
             service = getattr(service_module, self.spec.service_class_name)
 
             if not issubclass(service, Service):
                 raise ValueError("Not a Service subclass")
 
+            return service
         except (ValueError, AttributeError):
-            result = DeploymentResult(result=PythonRuntimeResult.SERVICE_INSTALL_FAILED, artifact_id=self._id)
-
-            future.set_result(result)
-            return
-
-        self._service_class = service
-        result = DeploymentResult(result=PythonRuntimeResult.OK, artifact_id=self._id)
-        future.set_result(result)
+            return None
 
     def get_service(self) -> Type[Service]:
         """Returns service type."""
