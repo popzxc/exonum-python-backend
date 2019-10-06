@@ -18,47 +18,34 @@ class _WithSchemaMeta(abc.ABCMeta):
     """
 
     def __new__(cls, name: str, bases: Tuple[type, ...], dct: Dict[str, Any], **kwargs: Any) -> type:  # type: ignore
+        """This method does not mutate the class, it's only performing all required checks:
+
+        - Class should be directly derived from `WithSchema`;
+        - Class should have `Named` in the type hierarchy;
+        - Class should provide `_schema` attribute and it should point to the class derived from `Schema`;
+        - Class should provide `_state_hash_` attribute and it shoul contain names of Proof*Index indices
+          from the schema. If there is no state hash for class, this attribute should be an empty list.
+        """
         if name == "WithSchema":
             # Proxy class, skip it.
             return super().__new__(  # type: ignore  # mypy doesn't see ABCMeta signature
                 cls, name, bases, dct, **kwargs
             )
 
-        # TODO refactor code below to be more readable
-
         # Check that class is derived from `WithSchema`.
-        if WithSchema not in bases:
-            raise TypeError("Classes with schema should be derived from WithSchema class")
+        cls._verify_cls_derived_from_with_schema(bases)
 
         # Check that class is subclass of `Named`.
-        # To check it we check if any of class bases is subclass of `Named`.
-        if not any(map(lambda t: issubclass(t, Named), bases)):
-            raise TypeError("Classes with schema should be subclasses of `Named` class")
+        cls._verify_named_in_bases(bases)
 
         # Check that _schema_ attribute is set.
         schema = dct.get("_schema_")
-        if schema is None or not issubclass(schema, Schema):
-            raise cls._incorrect_schema_attribute_error()
+        cls._verify_schema_attr(schema)
+        assert schema is not None
 
         # Check that if _state_hash_ attribute is set, it has correct layout.
         state_hash = dct.get("_state_hash_")
-        if state_hash is not None:
-            if not isinstance(state_hash, list):
-                raise AttributeError("_state_hash_ attribute must be a list of strings")
-
-            for item in state_hash:
-                if not isinstance(item, str):
-                    raise AttributeError("_state_hash_ attribute must be a list of strings")
-
-                # Indices from _state_hash_ should be names from _schema_
-                if getattr(schema, "_schema_meta").get(item) is None:
-                    raise AttributeError(f"Item '{item}' is not a part of defined _schema_")
-
-                if getattr(schema, "_schema_meta")[item] not in (ProofListIndex, ProofMapIndex):
-                    raise AttributeError(f"Item '{item}' is not a Proof*Index")
-
-        if "__getattr__" in dct:
-            raise AttributeError("Classes derived from `WithSchema` should not implement __getattr__")
+        cls._verify_state_hash_attr(schema, state_hash)
 
         new_class = super().__new__(cls, name, bases, dct, **kwargs)  # type: ignore
         return new_class
@@ -69,12 +56,56 @@ class _WithSchemaMeta(abc.ABCMeta):
 
         return AttributeError(message)
 
+    @staticmethod
+    def _verify_cls_derived_from_with_schema(bases: Tuple[type, ...]) -> None:
+        """Verifies that class directly inhetrits WithSchema"""
+        if WithSchema not in bases:
+            raise TypeError("Classes with schema should be directly derived from WithSchema class")
+
+    @staticmethod
+    def _verify_named_in_bases(bases: Tuple[type, ...]) -> None:
+        """Verifies that Named class is in the type hierarchy."""
+        # To check it we check if any of class bases is subclass of `Named`.
+        if not any(map(lambda t: issubclass(t, Named), bases)):
+            raise TypeError("Classes with schema should be subclasses of `Named` class")
+
+    @classmethod
+    def _verify_schema_attr(cls, schema: Optional[type]) -> None:
+        """Verifies that _schema_ attribute is a subclass of Schema"""
+        if schema is None or not issubclass(schema, Schema):
+            raise cls._incorrect_schema_attribute_error()
+
+    @staticmethod
+    def _verify_state_hash_attr(schema: Dict[str, Any], state_hash: Optional[Dict[str, Any]]) -> None:
+        """Verifies that state hash attribute is a list of schema index names
+        and every element in that list points to Proof*Index."""
+
+        if state_hash is None:
+            raise AttributeError(
+                "_state_hash_ attribute must be a list of strings. If you don't need state hash, use empty list"
+            )
+
+        if not isinstance(state_hash, list):
+            raise AttributeError("_state_hash_ attribute must be a list of strings")
+
+        for item in state_hash:
+            if not isinstance(item, str):
+                raise AttributeError("_state_hash_ attribute must be a list of strings")
+
+            # Indices from _state_hash_ should be names from _schema_
+            if getattr(schema, "_schema_meta").get(item) is None:
+                raise AttributeError(f"Item '{item}' is not a part of defined _schema_")
+
+            if getattr(schema, "_schema_meta")[item] not in (ProofListIndex, ProofMapIndex):
+                raise AttributeError(f"Item '{item}' is not a Proof*Index")
+
 
 class WithSchema(metaclass=_WithSchemaMeta):
     """Base class for classes that do work with database.
 
-    Classes derived from `WithSchema` should define two class
-    attributes:
+    Classes derived from `WithSchema` should also inherit `Named` (directly or indirectly).
+
+    Also class should define two class attributes:
 
     _schema_ -- a type derived from Schema, for example:
 
@@ -87,6 +118,8 @@ class WithSchema(metaclass=_WithSchemaMeta):
 
     Please note that provided names should persist in schema passed to the _schema_ attribute
     and point to `Proof*Index` type. Otherwise an exception will be raised.
+
+    If no state hash should be calculated for class, `_state_hash_` should be an empty list.
     """
 
     _schema_: Optional[Type["Schema"]] = None
@@ -104,6 +137,10 @@ class WithSchema(metaclass=_WithSchemaMeta):
         assert issubclass(self._schema_, Schema)
         assert isinstance(self._state_hash_, list)
         assert isinstance(self, Named)
+
+        if not self._state_hash_:
+            # No state hash should be calculated, return an empty list without creating schema.
+            return []
 
         # _schema_ is type, it's callable (see check above)
         # pylint: disable=not-callable
@@ -127,6 +164,15 @@ class _SchemaMeta(abc.ABCMeta):
     """
 
     def __new__(cls, name: str, bases: Tuple[type, ...], dct: Dict[str, Any], **kwargs: Any) -> type:  # type: ignore
+        """This method performs required checks and fills the "_schema_meta" attribute with
+        mapping `index name` => `index type`.
+
+        Performed checks:
+
+        - Class should directly inherit `Schema`;
+        - Class should provide type annotations to define used indices;
+        - Indices types should be inherited from `BaseIndex`.
+        """
         if name == "Schema":
             # Proxy class, skip it.
             return super().__new__(  # type: ignore  # mypy doesn't see ABCMeta signature
@@ -134,17 +180,16 @@ class _SchemaMeta(abc.ABCMeta):
             )
 
         # Check that class is derived from `Schema`.
-        if Schema not in bases:
-            raise TypeError("Schemas should be derived from Schema class")
+        cls._verify_schema_in_bases(bases)
 
-        annotations = dct.get("__annotations__")
+        # Check that class have type annotations and get them.
+        annotations = cls._get_annotations(dct)
 
-        if annotations is None:
-            raise AttributeError("Schema must provide information about used indices")
-
+        # Fill the schema metainformation
         dct["_schema_meta"] = dict()
 
         for index_name, index_type in annotations.items():
+            # Check that index type is subclass of `BaseIndex`.
             if not issubclass(index_type, BaseIndex):
                 raise AttributeError(f"Incorrect index type: {index_type}")
 
@@ -152,6 +197,20 @@ class _SchemaMeta(abc.ABCMeta):
 
         new_class = super().__new__(cls, name, bases, dct, **kwargs)  # type: ignore
         return new_class
+
+    @staticmethod
+    def _verify_schema_in_bases(bases: Tuple[type, ...]) -> None:
+        if Schema not in bases:
+            raise TypeError("Schemas should be derived from Schema class")
+
+    @staticmethod
+    def _get_annotations(dct: Dict[str, Any]) -> Dict[str, Any]:
+        annotations = dct.get("__annotations__")
+
+        if annotations is None:
+            raise AttributeError("Schema must provide information about used indices")
+
+        return annotations
 
 
 class Schema(metaclass=_SchemaMeta):
@@ -170,6 +229,10 @@ class Schema(metaclass=_SchemaMeta):
     >>> class SchemaUser(WithSchema):
     ...     _schema_ = CurrencySchema
     ...     _state_hash_ = ["wallets"]
+
+    Please note that this class overrides `__getattribute__` method to provide
+    handy interface of interaction with schema, so user-defined schemas should
+    not override it.
     """
 
     @classmethod
