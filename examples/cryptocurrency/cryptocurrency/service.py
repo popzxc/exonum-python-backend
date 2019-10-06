@@ -1,7 +1,8 @@
 """Cryptocurrency Python Service"""
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import pickle
 
+from exonum_runtime.api.service_api import ServiceApi, ServiceApiContext
 from exonum_runtime.crypto import PublicKey
 
 # Runtime types
@@ -98,7 +99,7 @@ class Cryptocurrency(Service, WithSchema):
 
         schema = self._schema_(self, context.fork)
 
-        wallets = schema.wallets(context.fork)
+        wallets = schema.wallets()
 
         wallet_key = WalletKey(caller.author)
         wallet_name = transaction.name  # type: ignore
@@ -122,7 +123,7 @@ class Cryptocurrency(Service, WithSchema):
 
         schema = self._schema_(self, context.fork)
 
-        wallets = schema.wallets(context.fork)
+        wallets = schema.wallets()
 
         from_key = WalletKey(caller.author)
         to_key = WalletKey(PublicKey(transaction.to.data))  # type: ignore
@@ -148,6 +149,38 @@ class Cryptocurrency(Service, WithSchema):
         wallets[from_key] = sender
         wallets[to_key] = receiver
 
-    def wire_api(self) -> None:
+    def wire_api(self) -> Optional[ServiceApi]:
         # No api
         pass
+
+
+class CryptocurrencyApi(ServiceApi):
+    """API of the Cryptocurrency service"""
+
+    @staticmethod
+    def get_wallet(context: ServiceApiContext, wallet_id: str) -> Optional[Dict]:
+        """Endpoing for getting a single wallet."""
+
+        try:
+            key = WalletKey(PublicKey(bytes.fromhex(wallet_id)))
+        except ValueError:
+            return None
+
+        schema = Cryptocurrency.schema(context.instance_name, context.snapshot)
+
+        wallets = schema.wallets()
+
+        wallet = wallets.get(key)
+        if wallet is None:
+            return {"error": "Wallet not found"}
+
+        return {"pub_key": wallet.pub_key.hex(), "name": wallet.name, "balance": wallet.balance}
+
+    def public_endpoints(self) -> Dict[str, Dict[str, Any]]:
+        # Wallet endpoint accepts only 32-byte hex value as string.
+        endpoints = {r"/wallets/([[0-9a-fA-F]+]{64})": {"get": self.get_wallet}}
+
+        return endpoints
+
+    def private_endpoints(self) -> Dict[str, Dict[str, Any]]:
+        return dict()
