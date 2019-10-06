@@ -142,24 +142,27 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
             # Service is attempted to initialize but not started.
             return PythonRuntimeResult.UNKNOWN_SERVICE
 
-        fork = Fork(access)
-        try:
-            artifact, instance_spec = self._started_services[instance_id]
-            del self._started_services[instance_id]
+        with Fork(access) as fork:
+            assert isinstance(fork, Fork)
+            try:
+                artifact, instance_spec = self._started_services[instance_id]
+                del self._started_services[instance_id]
 
-            service_class = artifact.get_service()
-            service_instance = service_class(artifact.spec.service_library_name, fork, instance_spec.name, parameters)
+                service_class = artifact.get_service()
+                service_instance = service_class(
+                    artifact.spec.service_library_name, fork, instance_spec.name, parameters
+                )
 
-            self._instances[instance_id] = service_instance
+                self._instances[instance_id] = service_instance
 
-            return PythonRuntimeResult.OK
-        except ServiceError as error:
-            # Services are allowed to raise ServiceError to indicate that input data isn't valid.
-            return error
-        # Services are untrusted code, so we have to supress all the exceptions.
-        except Exception:  # pylint: disable=broad-except
-            # Indicate that service isn't OK.
-            return ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
+                return PythonRuntimeResult.OK
+            except ServiceError as error:
+                # Services are allowed to raise ServiceError to indicate that input data isn't valid.
+                return error
+            # Services are untrusted code, so we have to supress all the exceptions.
+            except Exception:  # pylint: disable=broad-except
+                # Indicate that service isn't OK.
+                return ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
 
     def stop_service(self, instance: InstanceDescriptor) -> PythonRuntimeResult:
         instance_id = instance.instance_id
@@ -189,21 +192,22 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         if instance_id not in self._instances:
             return PythonRuntimeResult.UNKNOWN_SERVICE
 
-        fork = Fork(context.access)
-        transaction_context = TransactionContext(fork, context.caller)
+        with Fork(context.access) as fork:
+            assert isinstance(fork, Fork)
+            transaction_context = TransactionContext(fork, context.caller)
 
-        try:
-            self._instances[instance_id].execute(transaction_context, call_info.method_id, arguments)
+            try:
+                self._instances[instance_id].execute(transaction_context, call_info.method_id, arguments)
 
-            return PythonRuntimeResult.OK
-        except ServiceError as error:
-            # Services are allowed to raise ServiceError to indicate that input data isn't valid.
-            return error
-        # Services are untrusted code, so we have to supress all the exceptions.
-        except Exception:  # pylint: disable=broad-except
-            # Indicate that service isn't OK and remove it from the running instances.
-            self._stop_service(instance_id)
-            return ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
+                return PythonRuntimeResult.OK
+            except ServiceError as error:
+                # Services are allowed to raise ServiceError to indicate that input data isn't valid.
+                return error
+            # Services are untrusted code, so we have to supress all the exceptions.
+            except Exception:  # pylint: disable=broad-except
+                # Indicate that service isn't OK and remove it from the running instances.
+                self._stop_service(instance_id)
+                return ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
 
     def artifact_protobuf_spec(self, artifact: ArtifactId) -> Optional[ArtifactProtobufSpec]:
         if not self.is_artifact_deployed(artifact):
@@ -245,23 +249,25 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         return StateHashAggregator(runtime, instances)
 
     def before_commit(self, access: RawIndexAccess) -> None:
-        fork = Fork(access)
+        with Fork(access) as fork:
+            assert isinstance(fork, Fork)
 
-        for instance_id, instance in self._instances.items():
-            try:
-                instance.before_commit(fork)
-            except Exception:  # pylint: disable=broad-except
-                # Remove service from the running instances and skip it.
-                self._stop_service(instance_id)
-                continue
+            for instance_id, instance in self._instances.items():
+                try:
+                    instance.before_commit(fork)
+                except Exception:  # pylint: disable=broad-except
+                    # Remove service from the running instances and skip it.
+                    self._stop_service(instance_id)
+                    continue
 
     def after_commit(self, access: RawIndexAccess) -> None:
-        snapshot = Snapshot(access)
+        with Snapshot(access) as snapshot:
+            assert isinstance(snapshot, Snapshot)
 
-        for instance_id, instance in self._instances.items():
-            try:
-                instance.after_commit(snapshot)
-            except Exception:  # pylint: disable=broad-except
-                # Remove service from the running instances and skip it.
-                self._stop_service(instance_id)
-                continue
+            for instance_id, instance in self._instances.items():
+                try:
+                    instance.after_commit(snapshot)
+                except Exception:  # pylint: disable=broad-except
+                    # Remove service from the running instances and skip it.
+                    self._stop_service(instance_id)
+                    continue
