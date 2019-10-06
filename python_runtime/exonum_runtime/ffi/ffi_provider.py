@@ -4,7 +4,7 @@ import ctypes as c
 
 from exonum_runtime.runtime.types import DeploymentResult
 from exonum_runtime.runtime.runtime_interface import RuntimeInterface
-from .raw_types import RawPythonMethods, RawArtifactId
+from .raw_types import RawPythonMethods, RawArtifactId, RawIndexAccess
 
 
 class RustFFIProvider:
@@ -38,6 +38,9 @@ class RustFFIProvider:
         self._rust_interface.init_python_side.argtypes = [c.POINTER(RawPythonMethods)]
         self._rust_interface.deployment_completed.argtypes = [RawArtifactId, c.c_uint8]
 
+        self._rust_interface.get_snapshot_token.argtypes = []
+        self._rust_interface.get_snapshot_token.restype = c.c_void_p
+
     def init_rust(self) -> None:
         """Initializes Python interfaces in the Rust side."""
         self._rust_interface.init_python_side(c.byref(self._ffi_callbacks))
@@ -55,3 +58,7 @@ class RustFFIProvider:
     def runtime(self) -> RuntimeInterface:
         """Returns runtime."""
         return self._runtime
+
+    def snapshot_token(self) -> RawIndexAccess:
+        """Retrieves an Snapshot token for API interaction."""
+        return self._rust_interface.get_snapshot_token()

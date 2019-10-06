@@ -1,7 +1,7 @@
 """TODO"""
 
 import asyncio
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union, List
 import os
 import sys
 
@@ -12,8 +12,7 @@ from exonum_runtime.proto import PythonArtifactSpec, ParseError
 from exonum_runtime.interfaces import Named
 from exonum_runtime.crypto import Hash
 
-from exonum_runtime.merkledb.schema import Schema, WithSchema
-from exonum_runtime.merkledb.indices import ProofMapIndex
+from exonum_runtime.merkledb.schema import WithSchema
 from exonum_runtime.merkledb.types import Fork, Snapshot
 
 from .artifact import Artifact
@@ -36,19 +35,14 @@ from .runtime_interface import RuntimeInterface
 from .service import Service
 from .service_error import ServiceError, GenericServiceError
 from .transaction_context import TransactionContext
-
-
-class PythonRuntimeSchema(Schema):
-    """Python runtime schema"""
-
-    services: ProofMapIndex
+from .runtime_schema import PythonRuntimeSchema
 
 
 class PythonRuntime(RuntimeInterface, Named, WithSchema):
     """TODO"""
 
     _schema_ = PythonRuntimeSchema
-    _state_hash_ = ["services"]
+    _state_hash_: List[str] = []
 
     def __init__(self, loop: asyncio.AbstractEventLoop, config_path: str) -> None:
         self._loop = loop
@@ -61,9 +55,12 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         self._started_services: Dict[InstanceId, Tuple[Artifact, InstanceSpec]] = {}
         self._instances: Dict[InstanceId, Service] = {}
 
+        # API section
+        self._snapshot_token = self._rust_ffi.snapshot_token()
         # TODO
         self._runtime_api = RuntimeApi(port=8080)
 
+        # Initialization
         self._init_artifacts()
 
         # Now we're ready to go, init python side.
@@ -83,7 +80,8 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         # Add built artifacts folder to the path.
         sys.path.append(built_artifacts_folder)
 
-        # TODO load artifacts & instances (don't forget to verify hashes)
+        # If this is a re-launch, dispatcher will init all the services,
+        # we don't have to do it manually.
 
     def _deploy_completed(self, future: asyncio.Future) -> None:
         result: DeploymentResult = future.result()
