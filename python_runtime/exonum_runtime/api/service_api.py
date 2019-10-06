@@ -53,8 +53,8 @@ def _call_method(method: Any, args: Tuple[Any, ...]) -> Dict[Any, Any]:
 class ServiceApi(metaclass=abc.ABCMeta):
     r"""Base class for service APIs.
 
-    Classes that inherit it, should implement two methods: `public_endpoints` and `private_endpoints`.
-    The only difference between those two is that the first should provide an public interface which can
+    Classes that inherit `ServiceApi` should implement two methods: `public_endpoints` and `private_endpoints`.
+    The only difference between those two is that the first should provide a public interface which can
     be accessed by everybody, and the second should provide an administrative interface.
 
     Those methods should return a description of api for the service in the following format:
@@ -96,11 +96,11 @@ class ServiceApi(metaclass=abc.ABCMeta):
 
     So, the expected signature for POST method of "/" endpoint from the example above would be
 
-    >>> async def main_post(context: ServiceApiContext, payload: Dict[str, Any])
+    >>> async def main_post(context: ServiceApiContext, payload: Dict[str, Any]) -> Dict[Any, Any]
 
     and for GET method of "/info/(\d+)" endpoint it would be:
 
-    >>> async def info_get(context: ServiceApiContext, query_string_parameter: str)
+    >>> async def info_get(context: ServiceApiContext, query_string_parameter: str) -> Dict[Any, Any]
     """
 
     @abc.abstractmethod

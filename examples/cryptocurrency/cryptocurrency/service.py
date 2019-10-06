@@ -166,7 +166,7 @@ class CryptocurrencyApi(ServiceApi):
     """API of the Cryptocurrency service"""
 
     @staticmethod
-    def get_wallet(context: ServiceApiContext, wallet_id: str) -> Optional[Dict]:
+    async def get_wallet(context: ServiceApiContext, wallet_id: str) -> Optional[Dict]:
         """Endpoing for getting a single wallet."""
 
         try:
