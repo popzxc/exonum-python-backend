@@ -1,6 +1,7 @@
 """Common types for python runtime."""
 from typing import NamedTuple, NewType, Tuple, List, Union, Optional
 from enum import IntEnum
+import os
 
 import ctypes as c
 
@@ -85,6 +86,22 @@ class ArtifactProtobufSpec(NamedTuple):
     """Proto sources of the artifact."""
 
     sources: List[ProtoSourceFile]
+
+    @classmethod
+    def from_folder(cls, folder: str) -> "ArtifactProtobufSpec":
+        """Parsers `.proto` files in the provided folder"""
+        file_names = os.listdir(folder)
+        sources = []
+
+        for proto_file_name in filter(lambda f: f.endswith(".proto"), file_names):
+            full_path = os.path.join(folder, proto_file_name)
+
+            with open(full_path, "r") as proto_file:
+                content = proto_file.read()
+
+                sources.append(ProtoSourceFile(proto_file_name, content))
+
+        return cls(sources)
 
 
 class StateHashAggregator(NamedTuple):
