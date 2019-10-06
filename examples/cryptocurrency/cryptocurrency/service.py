@@ -1,6 +1,7 @@
 """Cryptocurrency Python Service"""
 from typing import List, Optional, Dict, Any
 import pickle
+import os
 
 from exonum_runtime.api.service_api import ServiceApi, ServiceApiContext
 from exonum_runtime.crypto import PublicKey
@@ -9,6 +10,7 @@ from exonum_runtime.crypto import PublicKey
 from exonum_runtime.runtime.service import Service
 from exonum_runtime.runtime.service_error import ServiceError
 from exonum_runtime.runtime.transaction_context import TransactionContext
+from exonum_runtime.runtime.types import ArtifactProtobufSpec
 
 # Merkledb types
 from exonum_runtime.merkledb.indices import MapIndex
@@ -150,8 +152,14 @@ class Cryptocurrency(Service, WithSchema):
         wallets[to_key] = receiver
 
     def wire_api(self) -> Optional[ServiceApi]:
-        # No api
-        pass
+        return CryptocurrencyApi()
+
+    @classmethod
+    def proto_sources(cls) -> ArtifactProtobufSpec:
+        file_folder = os.path.split(__file__)[0]
+        proto_folder = os.path.join(file_folder, "proto")
+
+        return ArtifactProtobufSpec.from_folder(proto_folder)
 
 
 class CryptocurrencyApi(ServiceApi):
