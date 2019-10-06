@@ -1,10 +1,11 @@
 """Service interface."""
 import abc
-from typing import no_type_check, List, NamedTuple, Callable, Dict, Any, Type
+from typing import no_type_check, List, NamedTuple, Callable, Dict, Any, Type, Optional
 import importlib
 
 from google.protobuf.message import Message as ProtobufMessage, DecodeError as ProtobufDecodeError
 
+from exonum_runtime.api.service_api import ServiceApi
 from exonum_runtime.crypto import Hash
 from exonum_runtime.interfaces import Named
 from exonum_runtime.merkledb.types import Snapshot, Fork
@@ -118,7 +119,7 @@ class Service(Named, metaclass=abc.ABCMeta):
         to interact with instances of this service."""
 
     @abc.abstractmethod
-    def wire_api(self) -> None:
+    def wire_api(self) -> Optional[ServiceApi]:
         """Method called to create API endpoints."""
 
     def before_commit(self, fork: Fork) -> None:

@@ -18,14 +18,13 @@ import tornado.httpclient
 from tornado.escape import json_encode, json_decode
 
 from exonum_runtime.merkledb.types import Snapshot
-from exonum_runtime.runtime.service import Service
 
 
 class ServiceApiContext(NamedTuple):
     """Configuration of the API"""
 
     snapshot: Snapshot
-    service: Service
+    instance_name: str
 
 
 # Pylint isn't a friend of Tornado as it seems
@@ -52,14 +51,14 @@ def _call_method(method: Any, args: Tuple[Any, ...]) -> Dict[Any, Any]:
 
 
 class ServiceApi(metaclass=abc.ABCMeta):
-    """Base class for service APIs.
-    
+    r"""Base class for service APIs.
+
     Classes that inherit it, should implement two methods: `public_endpoints` and `private_endpoints`.
     The only difference between those two is that the first should provide an public interface which can
     be accessed by everybody, and the second should provide an administrative interface.
-    
+
     Those methods should return a description of api for the service in the following format:
-    
+
     >>>
     {
         r"endpoint/": {
@@ -83,6 +82,9 @@ class ServiceApi(metaclass=abc.ABCMeta):
     Handlers are async functions which return either a `dict` (in case of successfull API call), or `None`
     (if API call cannot be executed). If `dict` was returned, the status code of response will be OK and
     response will contain returned value as JSON. Otherwise, response status code will be BAD_REQUEST.
+
+    If service was able to process the API request, but however it turned out to be erroneous, it's recommended
+    to return a dict like `{"error": "description"}`.
 
     Types of HTTP methods that are currently supported: "get", "post", "put", "delete".
     For "get" and "delete" methods your handler should accept at least one argument of type `ServiceApiContext`.
@@ -205,17 +207,3 @@ class ServiceApi(metaclass=abc.ABCMeta):
         private_closed = self._private_api.close_all_connections()
 
         return (public_closed, private_closed)
-
-
-class RuntimeApi:
-    """Python Runtime API implementation."""
-
-    def __init__(self, _port: int):
-        # self._config = config
-
-        # self._app = tornado.web.Application(
-        #     [(r"/", _State, dict(config=config)), (r"/artifacts", _Artifact, dict(config=config))]
-        # )
-
-        # self._app.listen(port)
-        pass
