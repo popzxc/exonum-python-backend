@@ -4,6 +4,7 @@ use exonum_merkledb::{Fork, ListIndex, Snapshot};
 
 use super::binary_data::BinaryData;
 use super::common::parse_string;
+use crate::python_interface::BLOCK_SNAPSHOT;
 use crate::types::RawIndexAccess;
 
 #[repr(C)]
@@ -73,6 +74,16 @@ unsafe extern "C" fn get(index: *const RawListIndex, idx: u64, allocate: Allocat
             let index: ListIndex<&dyn Snapshot, Vec<u8>> = ListIndex::new(index_name, snapshot);
             index.get(idx)
         }
+        RawIndexAccess::SnapshotToken => {
+            match BLOCK_SNAPSHOT.read().expect("Block snapshot read").as_ref() {
+                Some(ref snapshot) => {
+                    let index: ListIndex<&dyn Snapshot, Vec<u8>> =
+                        ListIndex::new(index_name, snapshot.as_ref());
+                    index.get(idx)
+                }
+                None => None,
+            }
+        }
     };
 
     match value {
@@ -104,7 +115,7 @@ unsafe extern "C" fn push(index: *const RawListIndex, value: BinaryData) {
 
             index.push(value);
         }
-        RawIndexAccess::Snapshot(_) => {
+        _ => {
             panic!("Attempt to call mutable method with a snapshot");
         }
     }
@@ -137,7 +148,7 @@ unsafe extern "C" fn pop(index: *const RawListIndex, allocate: Allocate) -> Bina
                 },
             }
         }
-        RawIndexAccess::Snapshot(_) => {
+        _ => {
             panic!("Attempt to call mutable method with a snapshot");
         }
     }
@@ -156,6 +167,17 @@ unsafe extern "C" fn len(index: *const RawListIndex) -> u64 {
             let index: ListIndex<&dyn Snapshot, Vec<u8>> = ListIndex::new(index_name, snapshot);
             index.len() as u64
         }
+
+        RawIndexAccess::SnapshotToken => {
+            match BLOCK_SNAPSHOT.read().expect("Block snapshot read").as_ref() {
+                Some(ref snapshot) => {
+                    let index: ListIndex<&dyn Snapshot, Vec<u8>> =
+                        ListIndex::new(index_name, snapshot.as_ref());
+                    index.len() as u64
+                }
+                None => 0,
+            }
+        }
     }
 }
 
@@ -170,7 +192,7 @@ unsafe extern "C" fn set(index: *const RawListIndex, idx: u64, value: BinaryData
 
             index.set(idx, value);
         }
-        RawIndexAccess::Snapshot(_) => {
+        _ => {
             panic!("Attempt to call mutable method with a snapshot");
         }
     }
@@ -186,7 +208,7 @@ unsafe extern "C" fn clear(index: *const RawListIndex) {
 
             index.clear();
         }
-        RawIndexAccess::Snapshot(_) => {
+        _ => {
             panic!("Attempt to call mutable method with a snapshot");
         }
     }

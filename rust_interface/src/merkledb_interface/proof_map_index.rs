@@ -1,9 +1,11 @@
 use std::os::raw::c_char;
 
+use exonum::crypto::Hash;
 use exonum_merkledb::{Fork, ObjectHash, ProofMapIndex, Snapshot};
 
 use super::binary_data::BinaryData;
 use super::common::parse_string;
+use crate::python_interface::BLOCK_SNAPSHOT;
 use crate::types::RawIndexAccess;
 
 #[repr(C)]
@@ -82,6 +84,16 @@ unsafe extern "C" fn get(
                 ProofMapIndex::new(index_name, snapshot);
             index.get(&key)
         }
+        RawIndexAccess::SnapshotToken => {
+            match BLOCK_SNAPSHOT.read().expect("Block snapshot read").as_ref() {
+                Some(ref snapshot) => {
+                    let index: ProofMapIndex<&dyn Snapshot, Vec<u8>, Vec<u8>> =
+                        ProofMapIndex::new(index_name, snapshot.as_ref());
+                    index.get(&key)
+                }
+                None => None,
+            }
+        }
     };
 
     match value {
@@ -115,7 +127,7 @@ unsafe extern "C" fn put(index: *const RawProofMapIndex, key: BinaryData, value:
 
             index.put(&key, value);
         }
-        RawIndexAccess::Snapshot(_) => {
+        _ => {
             panic!("Attempt to call mutable method with a snapshot");
         }
     }
@@ -133,7 +145,7 @@ unsafe extern "C" fn remove(index: *const RawProofMapIndex, key: BinaryData) {
 
             index.remove(&key);
         }
-        RawIndexAccess::Snapshot(_) => {
+        _ => {
             panic!("Attempt to call mutable method with a snapshot");
         }
     }
@@ -150,7 +162,7 @@ unsafe extern "C" fn clear(index: *const RawProofMapIndex) {
 
             index.clear();
         }
-        RawIndexAccess::Snapshot(_) => {
+        _ => {
             panic!("Attempt to call mutable method with a snapshot");
         }
     }
@@ -170,6 +182,16 @@ unsafe extern "C" fn object_hash(index: *const RawProofMapIndex, allocate: Alloc
             let index: ProofMapIndex<&dyn Snapshot, Vec<u8>, Vec<u8>> =
                 ProofMapIndex::new(index_name, snapshot);
             index.object_hash()
+        }
+        RawIndexAccess::SnapshotToken => {
+            match BLOCK_SNAPSHOT.read().expect("Block snapshot read").as_ref() {
+                Some(ref snapshot) => {
+                    let index: ProofMapIndex<&dyn Snapshot, Vec<u8>, Vec<u8>> =
+                        ProofMapIndex::new(index_name, snapshot.as_ref());
+                    index.object_hash()
+                }
+                None => Hash::zero(),
+            }
         }
     };
     let data: &[u8] = value.as_ref();

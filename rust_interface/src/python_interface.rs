@@ -3,6 +3,7 @@ use std::os::raw::c_void;
 use std::sync::RwLock;
 
 use exonum::runtime::ArtifactId;
+use exonum_merkledb::Snapshot;
 
 use super::{
     errors::PythonRuntimeResult,
@@ -16,6 +17,11 @@ use super::{
 lazy_static! {
     pub(crate) static ref PYTHON_INTERFACE: RwLock<PythonRuntimeInterface> =
         RwLock::new(PythonRuntimeInterface::default());
+
+    // This variable (once DB is available) stores the snapshot of the current block
+    // so API calls on the Python side can access the database.
+    pub(crate) static ref BLOCK_SNAPSHOT: RwLock<Option<Box<dyn Snapshot>>> =
+        RwLock::new(Default::default());
 }
 
 #[derive(Debug, Default)]

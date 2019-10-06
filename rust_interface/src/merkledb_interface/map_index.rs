@@ -4,6 +4,7 @@ use exonum_merkledb::{Fork, MapIndex, Snapshot};
 
 use super::binary_data::BinaryData;
 use super::common::parse_string;
+use crate::python_interface::BLOCK_SNAPSHOT;
 use crate::types::RawIndexAccess;
 
 #[repr(C)]
@@ -77,6 +78,16 @@ unsafe extern "C" fn get(
                 MapIndex::new(index_name, snapshot);
             index.get(&key)
         }
+        RawIndexAccess::SnapshotToken => {
+            match BLOCK_SNAPSHOT.read().expect("Block snapshot read").as_ref() {
+                Some(ref snapshot) => {
+                    let index: MapIndex<&dyn Snapshot, Vec<u8>, Vec<u8>> =
+                        MapIndex::new(index_name, snapshot.as_ref());
+                    index.get(&key)
+                }
+                None => None,
+            }
+        }
     };
 
     match value {
@@ -109,7 +120,7 @@ unsafe extern "C" fn put(index: *const RawMapIndex, key: BinaryData, value: Bina
 
             index.put(&key, value);
         }
-        RawIndexAccess::Snapshot(_) => {
+        _ => {
             panic!("Attempt to call mutable method with a snapshot");
         }
     }
@@ -126,7 +137,7 @@ unsafe extern "C" fn remove(index: *const RawMapIndex, key: BinaryData) {
 
             index.remove(&key);
         }
-        RawIndexAccess::Snapshot(_) => {
+        _ => {
             panic!("Attempt to call mutable method with a snapshot");
         }
     }
@@ -142,7 +153,7 @@ unsafe extern "C" fn clear(index: *const RawMapIndex) {
 
             index.clear();
         }
-        RawIndexAccess::Snapshot(_) => {
+        _ => {
             panic!("Attempt to call mutable method with a snapshot");
         }
     }

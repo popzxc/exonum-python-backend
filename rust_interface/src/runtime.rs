@@ -1,5 +1,6 @@
 use std::os::raw::c_void;
 use std::process::Child;
+use std::sync::Arc;
 
 use futures::{Future, IntoFuture};
 use sysinfo::{Pid, ProcessExt, ProcessStatus, RefreshKind, System, SystemExt};
@@ -9,11 +10,11 @@ use exonum::{
     node::ApiSender,
     runtime::{
         dispatcher::{DispatcherRef, DispatcherSender},
-        ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
-        InstanceDescriptor, InstanceSpec, Runtime, StateHashAggregator,
+        ApiChange, ApiContext, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext,
+        ExecutionError, InstanceDescriptor, InstanceSpec, Runtime, StateHashAggregator,
     },
 };
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::{Database, Fork, Snapshot};
 
 use super::{
     errors::PythonRuntimeResult,
@@ -25,11 +26,15 @@ use super::{
     },
 };
 
+// TODO provide it to python
+const SNAPSHOT_TOKEN: RawIndexAccess = RawIndexAccess::SnapshotToken;
+
 /// Sample runtime.
 #[derive(Debug)]
 pub struct PythonRuntime {
     python_process: Child,
     process_pid: Pid,
+    database: Option<Arc<Database>>,
 }
 
 impl PythonRuntime {
@@ -42,6 +47,7 @@ impl PythonRuntime {
         Self {
             python_process,
             process_pid,
+            database: None,
         }
     }
 
@@ -308,6 +314,13 @@ impl Runtime for PythonRuntime {
             let access = RawIndexAccess::Snapshot(snapshot);
 
             (python_interface.methods.before_commit)(&access as *const RawIndexAccess);
+        }
+    }
+
+    fn notify_api_changes(&self, context: &ApiContext, _changes: &[ApiChange]) {
+        if self.database.is_none() {
+            // TODO
+            // self.
         }
     }
 }

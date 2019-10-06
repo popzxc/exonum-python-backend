@@ -281,4 +281,5 @@ impl From<RawArtifactProtobufSpec> for ArtifactProtobufSpec {
 pub enum RawIndexAccess<'a> {
     Fork(&'a Fork),
     Snapshot(&'a dyn Snapshot),
+    SnapshotToken,
 }
