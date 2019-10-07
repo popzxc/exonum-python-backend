@@ -89,7 +89,7 @@ class Cryptocurrency(Service, WithSchema):
         # No initialization required.
         pass
 
-    @Cryptocurrency.transaction(tx_id=1, tx_name="TxCreateWallet")
+    @Service.transaction(tx_id=1, tx_name="TxCreateWallet")
     def create_wallet(
         self, context: TransactionContext, transaction: service_pb2.TxCreateWallet  # type: ignore
     ) -> None:
@@ -113,7 +113,7 @@ class Cryptocurrency(Service, WithSchema):
         else:
             raise CryptocurrencyError(CryptocurrencyError.WalletAlreadyExists)
 
-    @Cryptocurrency.transaction(tx_id=2, tx_name="TxTransfer")
+    @Service.transaction(tx_id=2, tx_name="TxTransfer")
     def transfer(
         self, context: TransactionContext, transaction: service_pb2.TxTransfer  # type: ignore
     ) -> None:
@@ -186,7 +186,7 @@ class CryptocurrencyApi(ServiceApi):
 
     def public_endpoints(self) -> Dict[str, Dict[str, Any]]:
         # Wallet endpoint accepts only 32-byte hex value as string.
-        endpoints = {r"/wallets/([[0-9a-fA-F]+]{64})": {"get": self.get_wallet}}
+        endpoints = {r"/wallets/([0-9a-fA-F]{64})": {"get": self.get_wallet}}
 
         return endpoints
 

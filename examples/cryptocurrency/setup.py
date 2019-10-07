@@ -2,7 +2,8 @@
 """Setup Script for the Exonum Python Cryptocurrency Service."""
 import setuptools
 
-INSTALL_REQUIRES = ["exonum_runtime"]
+# INSTALL_REQUIRES = ["exonum_runtime"]
+INSTALL_REQUIRES = []
 
 PYTHON_REQUIRES = ">=3.7"
 
