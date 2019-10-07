@@ -63,8 +63,10 @@ impl PythonRuntime {
             .get_process(self.process_pid)
             .ok_or_else(|| runtime_dead_err().unwrap_err())?;
 
+        info!("Python process state: {:?}", process.status());
+
         match process.status() {
-            ProcessStatus::Run => Ok(()),
+            ProcessStatus::Run | ProcessStatus::Idle | ProcessStatus::Sleep => Ok(()),
             _ => runtime_dead_err(),
         }
     }
@@ -80,6 +82,8 @@ impl Runtime for PythonRuntime {
             Ok(()) => {}
             Err(e) => return Box::new(Err(e).into_future()),
         }
+
+        info!("Deploy request of the artifact {}", artifact.name);
 
         let mut python_interface = PYTHON_INTERFACE.write().expect("Interface read");
 
