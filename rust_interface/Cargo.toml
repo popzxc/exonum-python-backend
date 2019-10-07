@@ -6,12 +6,13 @@ edition = "2018"
 
 [lib]
 name = "rust_interface"
-crate-type = ["rlib", "dylib"]
+crate-type = ["dylib"]
 
 [dependencies]
 futures = "0.1.25"
 lazy_static = "1.0.1"
 sysinfo = "0.9.5"
+log = "0.4"
 
 exonum = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }
 exonum-derive = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }
