@@ -17,6 +17,8 @@ def main() -> None:
 
     # TODO check if `protoc` is installed.
 
+    print("Started python runtime")
+
     config_path = parse_args()
 
     loop = asyncio.get_event_loop()

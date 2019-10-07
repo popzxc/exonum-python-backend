@@ -71,6 +71,7 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         self._init_artifacts()
 
         # Now we're ready to go, init python side.
+        print("Started rust part from python")
         self._rust_ffi.init_rust()
 
     def _init_artifacts(self) -> None:

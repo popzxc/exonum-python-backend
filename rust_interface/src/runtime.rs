@@ -1,9 +1,8 @@
 use std::os::raw::c_void;
-use std::process::Child;
 use std::sync::RwLock;
 
 use futures::{Future, IntoFuture};
-use sysinfo::{Pid, ProcessExt, ProcessStatus, RefreshKind, System, SystemExt};
+// use sysinfo::{Pid, ProcessExt, ProcessStatus, RefreshKind, System, SystemExt};
 
 use exonum::{
     api::ApiContext,
@@ -28,10 +27,8 @@ use super::{
 };
 
 /// Sample runtime.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PythonRuntime {
-    python_process: Child,
-    process_pid: Pid,
     api_context: RwLock<Option<ApiContext>>,
 }
 
@@ -39,36 +36,13 @@ impl PythonRuntime {
     /// Runtime identifier for the python runtime.
     const ID: u32 = 2;
 
-    pub fn new(python_process: Child) -> Self {
-        let process_pid: Pid = python_process.id() as Pid;
-
-        Self {
-            python_process,
-            process_pid,
-            api_context: RwLock::new(None),
-        }
+    pub fn new() -> Self {
+        Default::default()
     }
 
     /// Checks that process is still running.
     fn ensure_runtime(&self) -> Result<(), ExecutionError> {
-        let mut system = System::new_with_specifics(RefreshKind::new());;
-
-        system.refresh_process(self.process_pid);
-
-        // Closure for lazy evaluation.
-        let runtime_dead_err =
-            || PythonRuntimeResult::from_value(PythonRuntimeResult::RuntimeDead as u8);
-
-        let process = system
-            .get_process(self.process_pid)
-            .ok_or_else(|| runtime_dead_err().unwrap_err())?;
-
-        info!("Python process state: {:?}", process.status());
-
-        match process.status() {
-            ProcessStatus::Run | ProcessStatus::Idle | ProcessStatus::Sleep => Ok(()),
-            _ => runtime_dead_err(),
-        }
+        Ok(())
     }
 }
 

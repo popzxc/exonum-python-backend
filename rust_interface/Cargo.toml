@@ -11,10 +11,11 @@ crate-type = ["dylib"]
 [dependencies]
 futures = "0.1.25"
 lazy_static = "1.0.1"
-sysinfo = "0.9.5"
 log = "0.4"
+failure = "0.1.5"
 
 exonum = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }
 exonum-derive = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }
 exonum-merkledb = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }
 exonum-supervisor = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }
+exonum-cli = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }

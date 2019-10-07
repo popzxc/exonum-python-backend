@@ -1,6 +1,7 @@
 """TODO"""
 from typing import Any
 import ctypes as c
+from threading import Thread
 
 from exonum_runtime.runtime.types import DeploymentResult
 from exonum_runtime.runtime.runtime_interface import RuntimeInterface
@@ -40,6 +41,12 @@ class RustFFIProvider:
 
         self._rust_interface.get_snapshot_token.argtypes = []
         self._rust_interface.get_snapshot_token.restype = c.c_void_p
+
+        self._rust_interface.main.argtypes = []
+
+        self._rust_thread = Thread(target=self._rust_interface.main)
+        self._rust_thread.setDaemon(True)
+        self._rust_thread.start()
 
     def init_rust(self) -> None:
         """Initializes Python interfaces in the Rust side."""
