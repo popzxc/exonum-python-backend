@@ -1,6 +1,6 @@
 """C callbacks to be provided to Rust"""
 
-from typing import Set, List, Any
+from typing import List, Any, Dict
 import ctypes as c
 
 from .raw_types import (
@@ -21,7 +21,7 @@ from exonum_runtime.runtime.types import PythonRuntimeResult
 # Dynamically allocated resources
 #
 # Resources are freed by the rust through a `free` method call.
-_RESOURCES: Set[c.c_void_p] = set()
+_RESOURCES: Dict[int, c.c_void_p] = dict()
 # Resources allocated by the merkledb.
 _MERKLEDB_ALLOCATED: List[Any] = list()
 
@@ -31,7 +31,7 @@ def deploy_artifact(raw_artifact, raw_data, raw_data_len):  # type: ignore # Sig
     """Function called from Rust to indicate an artifact deploy request."""
     artifact_id = raw_artifact.into_artifact_id()
 
-    artifact_spec = bytes((c.c_ubyte * raw_data_len.value).from_buffer(raw_data)[:])
+    artifact_spec = bytes(raw_data[:raw_data_len])
 
     ffi = RustFFIProvider.instance()
 
@@ -111,7 +111,7 @@ def execute(raw_call_info, raw_context, parameters, parameters_len):  # type: ig
     return PythonRuntimeResult.SERVICE_ERRORS_START + result.code
 
 
-@c.CFUNCTYPE(None, c.POINTER(c.POINTER(RawStateHashAggregator)))
+@c.CFUNCTYPE(None, c.c_void_p, c.POINTER(c.POINTER(RawStateHashAggregator)))
 def state_hashes(access, state_hash_aggregator):  # type: ignore # Signature is one line above.
     """Function called from Rust to retrieve state hashes."""
     ffi = RustFFIProvider.instance()
@@ -121,7 +121,9 @@ def state_hashes(access, state_hash_aggregator):  # type: ignore # Signature is 
     raw_state_hashes = RawStateHashAggregator.from_state_hash_aggregator(hashes)
     raw_state_hashes_ptr = c.pointer(raw_state_hashes)
 
-    _RESOURCES.add(c.cast(raw_state_hashes_ptr, c.c_void_p))
+    void_p = c.cast(raw_state_hashes_ptr, c.c_void_p)
+    _RESOURCES[void_p.value] = void_p
+    # _RESOURCES.add(c.cast(raw_state_hashes_ptr, c.c_void_p))
 
     state_hash_aggregator.content = raw_state_hashes_ptr
 
@@ -139,14 +141,16 @@ def artifact_protobuf_spec(raw_artifact_id, spec):  # type: ignore # Signature i
         raw_spec = RawArtifactProtobufSpec.from_artifact_protobuf_spec(spec)
         raw_spec_ptr = c.pointer(raw_spec)
 
-        _RESOURCES.add(c.cast(raw_spec_ptr, c.c_void_p))
+        void_p = c.cast(raw_spec_ptr, c.c_void_p)
+
+        _RESOURCES[void_p.value] = void_p
     else:
         raw_spec_ptr = None
 
     spec.content = raw_spec_ptr
 
 
-@c.CFUNCTYPE(None)
+@c.CFUNCTYPE(None, c.c_void_p)
 def before_commit(access):  # type: ignore # Signature is one line above.
     """Before commit callback."""
     ffi = RustFFIProvider.instance()
@@ -177,7 +181,8 @@ def free_resource(resource):  # type: ignore # Signature is one line above.
     """Callback called when resource is consumed and can be freed."""
 
     # TODO probably not work
-    _RESOURCES.remove(resource)
+    # _RESOURCES.remove(resource)
+    del _RESOURCES[resource.value]
 
 
 def free_merkledb_allocated() -> None:

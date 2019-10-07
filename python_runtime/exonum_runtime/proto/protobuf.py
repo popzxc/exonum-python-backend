@@ -43,7 +43,7 @@ class PythonArtifactSpec(NamedTuple):
         service_class_name = python_spec.service_class_name
 
         try:
-            expected_hash = Hash(python_spec.hash_bytes)
+            expected_hash = Hash(python_spec.hash)
         except ValueError:
             raise ParseError("Incorrect hash value")
 
