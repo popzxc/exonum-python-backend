@@ -21,7 +21,7 @@ use super::{
     pending_deployment::PendingDeployment,
     python_interface::{BLOCK_SNAPSHOT, PYTHON_INTERFACE},
     types::{
-        into_ptr_and_len, RawArtifactId, RawArtifactProtobufSpec, RawCallInfo, RawExecutionContext,
+        convert_string, into_ptr_and_len, RawArtifactId, RawArtifactProtobufSpec, RawCallInfo, RawExecutionContext,
         RawIndexAccess, RawInstanceDescriptor, RawInstanceSpec, RawStateHashAggregator,
     },
 };
@@ -63,7 +63,9 @@ impl Runtime for PythonRuntime {
 
         // Call the python side of `deploy_artifact`.
         let result = unsafe {
-            let python_artifact_id = RawArtifactId::from_artifact_id(&artifact);
+            let artifact_name = convert_string(&artifact.name);
+
+            let python_artifact_id = RawArtifactId::from_artifact_id(&artifact, &artifact_name);
             let (spec_bytes_ptr, spec_bytes_len) = into_ptr_and_len(&spec);
             (python_interface.methods.deploy_artifact)(
                 python_artifact_id,
@@ -97,7 +99,8 @@ impl Runtime for PythonRuntime {
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
         unsafe {
-            let python_artifact_id = RawArtifactId::from_artifact_id(id);
+            let artifact_name = convert_string(&id.name);
+            let python_artifact_id = RawArtifactId::from_artifact_id(id, &artifact_name);
             (python_interface.methods.is_artifact_deployed)(python_artifact_id)
         }
     }
@@ -108,7 +111,9 @@ impl Runtime for PythonRuntime {
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
         let result = unsafe {
-            let python_instance_spec = RawInstanceSpec::from_instance_spec(spec);
+            let artifact_name = convert_string(&spec.artifact.name);
+            let instance_name = convert_string(&spec.name);
+            let python_instance_spec = RawInstanceSpec::from_instance_spec(spec, &instance_name, &artifact_name);
 
             (python_interface.methods.start_service)(python_instance_spec)
         };
@@ -127,8 +132,10 @@ impl Runtime for PythonRuntime {
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
         let result = unsafe {
+            let name = convert_string(descriptor.name);
+
             let python_instance_descriptor =
-                RawInstanceDescriptor::from_instance_descriptor(&descriptor);
+                RawInstanceDescriptor::from_instance_descriptor(&descriptor, &name);
 
             let access = RawIndexAccess::Fork(fork);
 
@@ -150,8 +157,9 @@ impl Runtime for PythonRuntime {
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
         let result = unsafe {
+            let name = convert_string(descriptor.name);
             let python_instance_descriptor =
-                RawInstanceDescriptor::from_instance_descriptor(&descriptor);
+                RawInstanceDescriptor::from_instance_descriptor(&descriptor, &name);
 
             (python_interface.methods.stop_service)(python_instance_descriptor)
         };
@@ -174,9 +182,12 @@ impl Runtime for PythonRuntime {
 
             let access = RawIndexAccess::Fork(context.fork);
 
+            let interface_name = convert_string(context.interface_name);
+
             let python_execution_context = RawExecutionContext::from_execution_context(
                 context,
                 &access as *const RawIndexAccess,
+                &interface_name,
             );
             let python_call_info = RawCallInfo::from_call_info(call_info);
 
@@ -196,7 +207,8 @@ impl Runtime for PythonRuntime {
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
         unsafe {
-            let python_artifact_id = RawArtifactId::from_artifact_id(id);
+            let artifact_name = convert_string(&id.name);
+            let python_artifact_id = RawArtifactId::from_artifact_id(id, &artifact_name);
             let raw_protobuf_spec_ptr: *mut RawArtifactProtobufSpec =
                 std::ptr::null::<RawArtifactProtobufSpec>() as *mut RawArtifactProtobufSpec;
 

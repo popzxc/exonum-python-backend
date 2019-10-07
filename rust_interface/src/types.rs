@@ -1,4 +1,4 @@
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
 use exonum::crypto::Hash;
@@ -16,6 +16,10 @@ pub unsafe fn into_ptr_and_len(data: &[u8]) -> (*const u8, usize) {
     (data_ptr, data_len)
 }
 
+pub fn convert_string(data: &str) -> CString {
+    CString::new(data).expect("Unable to parse string")
+}
+
 #[repr(C)]
 pub struct RawArtifactId {
     pub runtime_id: u32,
@@ -23,12 +27,14 @@ pub struct RawArtifactId {
 }
 
 impl RawArtifactId {
-    pub unsafe fn from_artifact_id(artifact: &ArtifactId) -> RawArtifactId {
-        // This function isn't unsafe in the terms of language, but logically it is.
-        let artifact_name = artifact.name.as_ptr() as *const c_char;
+    // This function isn't unsafe in the terms of language, but logically it is.
+    pub unsafe fn from_artifact_id(
+        artifact: &ArtifactId,
+        artifact_name: &CString,
+    ) -> RawArtifactId {
         RawArtifactId {
             runtime_id: artifact.runtime_id,
-            name: artifact_name,
+            name: artifact_name.as_ptr(),
         }
     }
 }
@@ -56,13 +62,15 @@ pub struct RawInstanceSpec {
 }
 
 impl RawInstanceSpec {
-    pub unsafe fn from_instance_spec(instance_spec: &InstanceSpec) -> RawInstanceSpec {
-        let name = instance_spec.name.as_ptr() as *const c_char;
-
+    pub unsafe fn from_instance_spec(
+        instance_spec: &InstanceSpec,
+        instance_name: &CString,
+        artifact_name: &CString,
+    ) -> RawInstanceSpec {
         RawInstanceSpec {
             id: instance_spec.id,
-            name,
-            artifact: RawArtifactId::from_artifact_id(&instance_spec.artifact),
+            name: instance_name.as_ptr(),
+            artifact: RawArtifactId::from_artifact_id(&instance_spec.artifact, artifact_name),
         }
     }
 }
@@ -92,11 +100,10 @@ pub struct RawInstanceDescriptor {
 impl RawInstanceDescriptor {
     pub unsafe fn from_instance_descriptor(
         descriptor: &InstanceDescriptor,
+        name: &CString,
     ) -> RawInstanceDescriptor {
-        let name = descriptor.name.as_ptr() as *const c_char;
-
         RawInstanceDescriptor {
-            name,
+            name: name.as_ptr(),
             id: descriptor.id,
         }
     }
@@ -148,11 +155,12 @@ impl<'a> RawExecutionContext<'a> {
     pub unsafe fn from_execution_context(
         context: &'a ExecutionContext,
         access: *const RawIndexAccess<'a>,
+        interface_name: &CString,
     ) -> RawExecutionContext<'a> {
         RawExecutionContext {
             access,
             caller: RawCaller::from_caller(&context.caller),
-            interface_name: context.interface_name.as_ptr() as *const c_char,
+            interface_name: interface_name.as_ptr(),
         }
     }
 }
