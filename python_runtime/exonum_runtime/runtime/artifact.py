@@ -5,6 +5,7 @@ import os
 import sys
 import importlib
 
+from exonum_runtime.crypto import Hash
 from exonum_runtime.proto import PythonArtifactSpec
 
 from .types import ArtifactId, DeploymentResult, PythonRuntimeResult
@@ -74,6 +75,14 @@ class Artifact:
         out_dir = self._config.built_sources_folder
 
         tarball_path = os.path.join(in_dir, self.spec.source_wheel_name)
+
+        # Verify hash.
+        with open(tarball_path, "rb") as raw_file:
+            raw_file_content = raw_file.read()
+
+        file_hash = Hash.hash_data(raw_file_content)
+        if file_hash != self.spec.expected_hash:
+            return False
 
         # Install module using pip.
         install_command = " ".join([sys.executable, "-m", "pip", "install", tarball_path, "--target", out_dir])

@@ -93,7 +93,7 @@ class Cryptocurrency(Service, WithSchema):
     def create_wallet(
         self, context: TransactionContext, transaction: service_pb2.TxCreateWallet  # type: ignore
     ) -> None:
-        """Transaction for creating a new wallet"""
+        """Transaction for creating a new wallet."""
 
         caller = context.caller.as_transaction()
         if caller is None:
@@ -117,7 +117,7 @@ class Cryptocurrency(Service, WithSchema):
     def transfer(
         self, context: TransactionContext, transaction: service_pb2.TxTransfer  # type: ignore
     ) -> None:
-        """Transaction for creating a new wallet"""
+        """Transfers `amount` of the currency from one wallet to another."""
 
         caller = context.caller.as_transaction()
         if caller is None:

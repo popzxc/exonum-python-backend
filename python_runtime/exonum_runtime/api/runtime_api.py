@@ -1,6 +1,6 @@
 """Runtime API."""
 
-from typing import NamedTuple, List
+from typing import NamedTuple, List, Dict
 import http
 import os
 
@@ -11,6 +11,8 @@ import tornado.web
 import tornado.platform.asyncio
 import tornado.httpclient
 from tornado.escape import json_encode
+
+from exonum_runtime.crypto import Hash
 
 
 class RuntimeApiConfig(NamedTuple):
@@ -79,11 +81,17 @@ class _Artifact(tornado.web.RequestHandler):
                 )
 
         # Save the files (we're doing it only after checking that request is completely valid)
+
+        response: Dict[str, str] = dict()
         for uploaded in self.request.files["artifacts"]:
+            response[uploaded.filename] = Hash.hash_data(uploaded.body).hex()
+
             file_path = os.path.join(self._config.artifact_wheels_path, uploaded.filename)
 
             with open(file_path, "wb") as output:
                 output.write(uploaded.body)
+
+        self.write(response)
 
 
 class RuntimeApi:

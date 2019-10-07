@@ -55,6 +55,9 @@ def run() -> None:
 
     print(result)
 
+    if result.status_code == 200:
+        print(result.json())
+
 
 if __name__ == "__main__":
     run()

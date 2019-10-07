@@ -156,7 +156,7 @@ class WithSchema(metaclass=_WithSchemaMeta):
         return state_hashes
 
     @classmethod
-    def schema(cls, owner: Union[Named, str], access: Access) -> Schema:
+    def schema(cls, owner: Union[Named, str], access: Access) -> "Schema":
         """Gets the Schema assotiated with that service."""
         assert cls._schema_ is not None, "Attempt to call `schema()` on class without schema"
 
