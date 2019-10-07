@@ -4,6 +4,7 @@ from typing import Optional, Type, Any
 import os
 import sys
 import importlib
+import logging
 
 from exonum_runtime.crypto import Hash
 from exonum_runtime.proto import PythonArtifactSpec
@@ -25,34 +26,47 @@ class Artifact:
         self._id = artifact_id
         self._config = config
         self._service_class: Optional[Type[Service]] = None
+        self._logger = logging.getLogger(__name__)
 
     async def deploy(self, future: asyncio.Future) -> None:
         """Performs the deploy process."""
 
+        self._logger.info("Starting artifact deploying...")
+
         # Check if service is already deployed
         try:
-            # Artifact is installed, no actions required.
             service_class = self._get_service_class()
+            self._logger.debug("Found installed artifact...")
+
             self._service_class = service_class
             result = DeploymentResult(result=PythonRuntimeResult.OK, artifact_id=self._id)
             future.set_result(result)
+
+            # Artifact is installed, no actions required.
+            self._logger.info("Artifact loaded, exiting coroutine...")
             return
         except ArtifactLoadError:
             # Nope, artifact is not installed, install it.
             pass
 
+        self._logger.debug("Artifact is not installed, installing...")
+
         # Install the tarball
         install_success = await self._install_tarball()
 
         if not install_success:
+            self._logger.error("Artifact install failed...")
             result = DeploymentResult(result=PythonRuntimeResult.SERVICE_INSTALL_FAILED, artifact_id=self._id)
 
             future.set_result(result)
             return
 
+        self._logger.debug("Installed artifact...")
+
         # Try to import service library.
         service_module = self._get_service_module()
         if service_module is None:
+            self._logger.error("Artifact loading failed...")
             result = DeploymentResult(result=PythonRuntimeResult.SERVICE_INSTALL_FAILED, artifact_id=self._id)
 
             future.set_result(result)
@@ -61,11 +75,13 @@ class Artifact:
         # Try to get service class.
         service = self._get_service_class_from_module(service_module)
         if service is None:
+            self._logger.error("Artifact doesn't have expected class...")
             result = DeploymentResult(result=PythonRuntimeResult.SERVICE_INSTALL_FAILED, artifact_id=self._id)
 
             future.set_result(result)
             return
 
+        self._logger.info("Sucessfully installed artifact %s", self._id.name)
         self._service_class = service
         result = DeploymentResult(result=PythonRuntimeResult.OK, artifact_id=self._id)
         future.set_result(result)
@@ -91,10 +107,15 @@ class Artifact:
             install_command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
 
-        _, _ = await proc.communicate()
+        _, stderr = await proc.communicate()
+
+        success = proc.returncode == 0
+
+        if not success:
+            self._logger.error("pip install failed, stderr is:\n%s", stderr)
 
         # On successfull installation pip should return 0.
-        return proc.returncode == 0
+        return success
 
     def _get_service_module(self) -> Optional[Any]:
         try:

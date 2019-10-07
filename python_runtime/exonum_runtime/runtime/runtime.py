@@ -4,8 +4,10 @@ import asyncio
 from typing import Dict, Optional, Tuple, Union, List
 import os
 import sys
+import logging
 
 # Uncategorized imports
+from exonum_runtime.api.service_api import ServiceApi, ServiceApiContext
 from exonum_runtime.api.runtime_api import RuntimeApi, RuntimeApiConfig
 from exonum_runtime.proto import PythonArtifactSpec, ParseError
 from exonum_runtime.interfaces import Named
@@ -50,6 +52,8 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
     _state_hash_: List[str] = []
 
     def __init__(self, loop: asyncio.AbstractEventLoop, config_path: str) -> None:
+        self._logger = logging.getLogger(__name__)
+
         self._loop = loop
         self._configuration = Configuration(config_path)
         self._rust_ffi = RustFFIProvider(self._configuration.rust_lib_path, self, build_callbacks())
@@ -65,14 +69,16 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         self._api_snapshot = Snapshot(self._rust_ffi.snapshot_token())
         self._api_snapshot.set_always_valid()
         # TODO
-        self._runtime_api = RuntimeApi(port=8090, config=api_config)
+        self._runtime_api = RuntimeApi(port=self._configuration.runtime_api_port, config=api_config)
+        self._free_service_port = self._configuration.service_api_ports_start
+        self._service_api: Dict[str, ServiceApi] = dict()
 
         # Initialization
         self._init_artifacts()
 
         # Now we're ready to go, init python side.
-        print("Started rust part from python")
         self._rust_ffi.init_rust()
+        self._logger.debug("Initialized rust part")
 
     def _init_artifacts(self) -> None:
         # Create artifacts sources folder if needed.
@@ -87,6 +93,8 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
 
         # Add built artifacts folder to the path.
         sys.path.append(built_artifacts_folder)
+
+        print("")
 
         # If this is a re-launch, dispatcher will init all the services,
         # we don't have to do it manually.
@@ -111,10 +119,13 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
     # Implementation of RuntimeInterface.
 
     def request_deploy(self, artifact_id: ArtifactId, artifact_spec: bytes) -> PythonRuntimeResult:
+        self._logger.debug("Received deploy request of artifact %s", artifact_id.name)
         try:
             spec = PythonArtifactSpec.from_bytes(artifact_spec)
         except ParseError:
             return PythonRuntimeResult.WRONG_SPEC
+
+        self._logger.debug("Successfully parsed artifact spec %s", spec)
 
         artifact = Artifact(artifact_id, spec, self._configuration)
 
@@ -122,6 +133,8 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         deploy_future.add_done_callback(self._deploy_completed)
 
         self._loop.create_task(artifact.deploy(deploy_future))
+
+        # self._loop.run_until_complete(deploy_future)
 
         self._pending_deployments[artifact_id] = artifact
 
@@ -131,8 +144,9 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         return artifact_id in self._artifacts
 
     def start_instance(self, instance_spec: InstanceSpec) -> PythonRuntimeResult:
+        self._logger.info("Received start instance request for instance %s", instance_spec)
         artifact_id = instance_spec.artifact
-        if self.is_artifact_deployed(artifact_id):
+        if not self.is_artifact_deployed(artifact_id):
             return PythonRuntimeResult.UNKNOWN_SERVICE
 
         artifact = self._artifacts[artifact_id]
@@ -161,13 +175,30 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
 
                 self._instances[instance_id] = service_instance
 
+                # Start service API (TODO move into separate function)
+                instance_name = service_instance.instance_name()
+                instance_api = service_instance.wire_api()
+                if instance_api is not None:
+                    # TODO check received class
+                    public_port = self._free_service_port
+                    private_port = self._free_service_port + 1
+                    self._free_service_port += 2
+
+                    context = ServiceApiContext(self._api_snapshot, instance_name)
+
+                    self._service_api[instance_name] = instance_api
+
+                    self._loop.create_task(instance_api.start(context, public_port, private_port))
+
                 return PythonRuntimeResult.OK
             except ServiceError as error:
                 # Services are allowed to raise ServiceError to indicate that input data isn't valid.
+                self._logger.debug("Initialize service error (emitted by service): %s", error)
                 return error
             # Services are untrusted code, so we have to supress all the exceptions.
-            except Exception:  # pylint: disable=broad-except
+            except Exception as error:  # pylint: disable=broad-except
                 # Indicate that service isn't OK.
+                self._logger.debug("Initialize service error (emitted by runtime): %s", error)
                 return ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
 
     def stop_service(self, instance: InstanceDescriptor) -> PythonRuntimeResult:

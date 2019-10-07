@@ -54,7 +54,7 @@ class RawArtifactId(c.Structure):
     @classmethod
     def from_artifact_id(cls, artifact_id: ArtifactId) -> "RawArtifactId":
         """Converts python version of ArtifactID into c-compatible."""
-        return cls(runtime_id=artifact_id.runtime_id, name=artifact_id.name)
+        return cls(runtime_id=artifact_id.runtime_id, name=bytes(artifact_id.name, "utf-8"))
 
 
 class RawInstanceSpec(c.Structure):
@@ -86,7 +86,7 @@ class RawInstanceDescriptor(c.Structure):
     def into_instance_descriptor(self) -> InstanceDescriptor:
         """Converts c-like artifact id into python-friendly form."""
         name = str(c.string_at(self.name), "utf-8")
-        instance_id = InstanceId(self.instance_id)
+        instance_id = InstanceId(self.id)
 
         return InstanceDescriptor(instance_id, name)
 

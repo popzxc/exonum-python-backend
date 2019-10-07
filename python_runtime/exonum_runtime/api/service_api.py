@@ -31,12 +31,12 @@ class ServiceApiContext(NamedTuple):
 # pylint: disable=abstract-method
 
 
-def _call_method(method: Any, args: Tuple[Any, ...]) -> Dict[Any, Any]:
+async def _call_method(method: Any, args: Tuple[Any, ...]) -> Dict[Any, Any]:
     if not method:
         raise tornado.web.HTTPError(http.client.METHOD_NOT_ALLOWED)
 
     try:
-        result = method(*args)
+        result = await method(*args)
 
     except Exception:  # pylint: disable=broad-except
         raise tornado.web.HTTPError(http.client.INTERNAL_SERVER_ERROR)
@@ -131,43 +131,43 @@ class ServiceApi(metaclass=abc.ABCMeta):
 
                 return data
 
-            def get(self, *args: Any) -> None:
+            async def get(self, *args: Any) -> None:
                 """Wrapper of the get request."""
 
                 if "get" not in handlers:
                     raise tornado.web.HTTPError(http.client.METHOD_NOT_ALLOWED)
 
-                result = _call_method(handlers.get("get"), (context, *args))
+                result = await _call_method(handlers.get("get"), (context, *args))
 
                 self.write(json_encode(result))
 
-            def delete(self, *args: Any) -> None:
+            async def delete(self, *args: Any) -> None:
                 """Wrapper of the delete request."""
 
                 if "delete" not in handlers:
                     raise tornado.web.HTTPError(http.client.METHOD_NOT_ALLOWED)
 
-                result = _call_method(handlers.get("delete"), (context, *args))
+                result = await _call_method(handlers.get("delete"), (context, *args))
 
                 self.write(json_encode(result))
 
-            def post(self, *args: Any) -> None:
+            async def post(self, *args: Any) -> None:
                 """Wrapper of the post request."""
                 if "post" not in handlers:
                     raise tornado.web.HTTPError(http.client.METHOD_NOT_ALLOWED)
 
                 data = self._parse_json_body()
-                result = _call_method(handlers.get("post"), (context, data, *args))
+                result = await _call_method(handlers.get("post"), (context, data, *args))
 
                 self.write(json_encode(result))
 
-            def put(self, *args: Any) -> None:
+            async def put(self, *args: Any) -> None:
                 """Wrapper of the post request."""
                 if "put" not in handlers:
                     raise tornado.web.HTTPError(http.client.METHOD_NOT_ALLOWED)
 
                 data = self._parse_json_body()
-                result = _call_method(handlers.get("put"), (context, data, *args))
+                result = await _call_method(handlers.get("put"), (context, data, *args))
 
                 self.write(json_encode(result))
 
@@ -179,7 +179,7 @@ class ServiceApi(metaclass=abc.ABCMeta):
     ) -> List[Tuple[str, type]]:
         return [(endpoint, cls._build_endpoint_handler(context, handler)) for (endpoint, handler) in config.items()]
 
-    def start(self, context: ServiceApiContext, public_port: int, private_port: int) -> None:
+    async def start(self, context: ServiceApiContext, public_port: int, private_port: int) -> None:
         """Starts the service API."""
         # Type check ignored in 2 lines because seems that tornado has incorrect type signature
 

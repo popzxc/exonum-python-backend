@@ -56,9 +56,9 @@ def start_service(raw_spec):  # type: ignore # Signature is one line above.
 
     ffi = RustFFIProvider.instance()
 
-    result = ffi.runtime().start_service(instance_spec)
+    result = ffi.runtime().start_instance(instance_spec)
 
-    return result.result.value
+    return result.value
 
 
 @c.CFUNCTYPE(c.c_uint8, RawIndexAccess, RawInstanceDescriptor, c.POINTER(c.c_uint8), c.c_uint32)
@@ -66,7 +66,7 @@ def initialize_service(access, descriptor, parameters, parameters_len):  # type:
     """Configure service instance"""
     instance_descriptor = descriptor.into_instance_descriptor()
 
-    parameters_bytes = bytes((c.c_ubyte * parameters_len.value).from_buffer(parameters)[:])
+    parameters_bytes = bytes(parameters[:parameters_len])
 
     ffi = RustFFIProvider.instance()
 
@@ -129,7 +129,7 @@ def state_hashes(access, state_hash_aggregator):  # type: ignore # Signature is 
 
 
 @c.CFUNCTYPE(None, RawArtifactId, c.POINTER(c.POINTER(RawArtifactProtobufSpec)))
-def artifact_protobuf_spec(raw_artifact_id, spec):  # type: ignore # Signature is one line above.
+def artifact_protobuf_spec(raw_artifact_id, spec_ptr):  # type: ignore # Signature is one line above.
     """Function called from Rust to retrieve artifact protobuf spec."""
     artifact_id = raw_artifact_id.into_artifact_id()
 
@@ -147,7 +147,7 @@ def artifact_protobuf_spec(raw_artifact_id, spec):  # type: ignore # Signature i
     else:
         raw_spec_ptr = None
 
-    spec.content = raw_spec_ptr
+    spec_ptr.content = raw_spec_ptr
 
 
 @c.CFUNCTYPE(None, c.c_void_p)

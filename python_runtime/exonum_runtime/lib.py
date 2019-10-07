@@ -2,6 +2,7 @@
 import asyncio
 import sys
 import os
+import logging
 
 import tornado.concurrent
 import tornado.ioloop
@@ -12,12 +13,21 @@ import tornado.httpclient
 from .runtime import PythonRuntime
 
 
+async def _asyncio_main(logger: logging.Logger, loop: asyncio.AbstractEventLoop) -> None:
+    while True:
+        await asyncio.sleep(0.1)
+
+
 def main() -> None:
     """Starts the Exonum Python Runtime."""
 
     # TODO check if `protoc` is installed.
 
-    print("Started python runtime")
+    logging.basicConfig(level=logging.DEBUG)
+
+    logger = logging.getLogger(__name__)
+
+    logger.debug("Started python runtime")
 
     config_path = parse_args()
 
@@ -27,7 +37,7 @@ def main() -> None:
 
     _runtime = PythonRuntime(loop, config_path)
 
-    loop.run_forever()
+    loop.run_until_complete(_asyncio_main(logger, loop))
 
 
 def parse_args() -> str:
