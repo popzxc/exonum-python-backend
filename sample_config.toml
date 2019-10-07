@@ -2,7 +2,5 @@
 rust_library_path = "~/hobby/exonum-python-backend/target/debug/librust_interface.so"
 artifacts_sources_folder = "/tmp/python_artifacts_sources"
 built_sources_folder = "/tmp/built_artifacts_sources"
-database = "leveldb"
-
-[database]
-# TODO
+api_port = 8090
+service_api_ports_start = 9000
