@@ -21,8 +21,9 @@ use super::{
     pending_deployment::PendingDeployment,
     python_interface::{BLOCK_SNAPSHOT, PYTHON_INTERFACE},
     types::{
-        convert_string, into_ptr_and_len, RawArtifactId, RawArtifactProtobufSpec, RawCallInfo, RawExecutionContext,
-        RawIndexAccess, RawInstanceDescriptor, RawInstanceSpec, RawStateHashAggregator,
+        convert_string, into_ptr_and_len, RawArtifactId, RawArtifactProtobufSpec, RawCallInfo,
+        RawExecutionContext, RawIndexAccess, RawInstanceDescriptor, RawInstanceSpec,
+        RawStateHashAggregator,
     },
 };
 
@@ -113,7 +114,8 @@ impl Runtime for PythonRuntime {
         let result = unsafe {
             let artifact_name = convert_string(&spec.artifact.name);
             let instance_name = convert_string(&spec.name);
-            let python_instance_spec = RawInstanceSpec::from_instance_spec(spec, &instance_name, &artifact_name);
+            let python_instance_spec =
+                RawInstanceSpec::from_instance_spec(spec, &instance_name, &artifact_name);
 
             (python_interface.methods.start_service)(python_instance_spec)
         };
@@ -209,12 +211,12 @@ impl Runtime for PythonRuntime {
         unsafe {
             let artifact_name = convert_string(&id.name);
             let python_artifact_id = RawArtifactId::from_artifact_id(id, &artifact_name);
-            let raw_protobuf_spec_ptr: *mut RawArtifactProtobufSpec =
+            let mut raw_protobuf_spec_ptr: *mut RawArtifactProtobufSpec =
                 std::ptr::null::<RawArtifactProtobufSpec>() as *mut RawArtifactProtobufSpec;
 
             (python_interface.methods.artifact_protobuf_spec)(
                 python_artifact_id,
-                &raw_protobuf_spec_ptr as *const *mut RawArtifactProtobufSpec,
+                &mut raw_protobuf_spec_ptr as *mut *mut RawArtifactProtobufSpec,
             );
 
             // Pointer will be nullptr if there is no protobuf spec for requested artifact.
