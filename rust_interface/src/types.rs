@@ -215,13 +215,13 @@ pub struct RawStateHashAggregator {
 impl From<RawStateHashAggregator> for StateHashAggregator {
     fn from(raw_aggregator: RawStateHashAggregator) -> StateHashAggregator {
         let overall_length: usize = raw_aggregator.length as usize;
-        let runtimes_ids_length: usize = overall_length - 1;
+        let instances_length: usize = overall_length - 1;
 
         let hashes = unsafe { std::slice::from_raw_parts(raw_aggregator.hashes, overall_length) };
         let hashes_lengths =
             unsafe { std::slice::from_raw_parts(raw_aggregator.hashes_length, overall_length) };
         let instance_ids =
-            unsafe { std::slice::from_raw_parts(raw_aggregator.instance_ids, runtimes_ids_length) };
+            unsafe { std::slice::from_raw_parts(raw_aggregator.instance_ids, instances_length) };
 
         let runtime_hashes = unsafe {
             std::slice::from_raw_parts(hashes[0], hashes_lengths[0] as usize)
@@ -230,7 +230,7 @@ impl From<RawStateHashAggregator> for StateHashAggregator {
                 .collect()
         };
 
-        let instances_hashes: Vec<(InstanceId, Vec<Hash>)> = (0..runtimes_ids_length)
+        let instances_hashes: Vec<(InstanceId, Vec<Hash>)> = (0..instances_length)
             .map(|i| {
                 let instance_hashes = unsafe {
                     std::slice::from_raw_parts(hashes[i + 1], hashes_lengths[i + 1] as usize)
