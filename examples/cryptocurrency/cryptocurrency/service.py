@@ -2,6 +2,7 @@
 from typing import List, Optional, Dict, Any
 import pickle
 import os
+import logging
 
 from exonum_runtime.api.service_api import ServiceApi, ServiceApiContext
 from exonum_runtime.crypto import PublicKey
@@ -21,6 +22,8 @@ from exonum_runtime.merkledb.types import Fork
 from .proto import service_pb2
 
 INIT_BALANCE = 100
+
+LOGGER = logging.getLogger(__name__)
 
 # Type checks are disabled for lines with protobuf structures because
 # unfortunately protobuf-generated sources use dynamic type creation magic,
@@ -94,9 +97,11 @@ class Cryptocurrency(Service, WithSchema):
         self, context: TransactionContext, transaction: service_pb2.TxCreateWallet  # type: ignore
     ) -> None:
         """Transaction for creating a new wallet."""
+        LOGGER.debug("TX create_wallet: starting execution tx")
 
         caller = context.caller.as_transaction()
         if caller is None:
+            LOGGER.debug("TX create_wallet: incorrect caller")
             raise CryptocurrencyError(CryptocurrencyError.IncorrectSender)
 
         schema = self._schema_(self, context.fork)
@@ -106,11 +111,15 @@ class Cryptocurrency(Service, WithSchema):
         wallet_key = WalletKey(caller.author)
         wallet_name = transaction.name  # type: ignore
 
+        LOGGER.debug("TX create_wallet: author => %s, name => %s", caller.author, wallet_name)
+
         if wallets.get(wallet_key) is None:
             wallet = Wallet(caller.author, wallet_name, INIT_BALANCE)
 
             wallets[wallet_key] = wallet
+            LOGGER.debug("TX create_wallet: created wallet")
         else:
+            LOGGER.debug("TX create_wallet: wallet already exists")
             raise CryptocurrencyError(CryptocurrencyError.WalletAlreadyExists)
 
     @Service.transaction(tx_id=2, tx_name="TxTransfer")
@@ -118,9 +127,11 @@ class Cryptocurrency(Service, WithSchema):
         self, context: TransactionContext, transaction: service_pb2.TxTransfer  # type: ignore
     ) -> None:
         """Transfers `amount` of the currency from one wallet to another."""
+        LOGGER.debug("TX transfer: starting execution tx")
 
         caller = context.caller.as_transaction()
         if caller is None:
+            LOGGER.debug("TX transfer: incorrect sender")
             raise CryptocurrencyError(CryptocurrencyError.IncorrectSender)
 
         schema = self._schema_(self, context.fork)
@@ -130,23 +141,32 @@ class Cryptocurrency(Service, WithSchema):
         from_key = WalletKey(caller.author)
         to_key = WalletKey(PublicKey(transaction.to.data))  # type: ignore
 
+        LOGGER.debug("TX create_wallet: from => %s, to => %s", from_key.key, to_key.key)
+
         sender: Optional[Wallet] = wallets.get(from_key)
         if sender is None:
+            LOGGER.debug("TX create_wallet: sender not found")
             raise CryptocurrencyError(CryptocurrencyError.SenderNotFound)
 
         receiver: Optional[Wallet] = wallets.get(to_key)
         if receiver is None:
+            LOGGER.debug("TX create_wallet: receiver not found")
             raise CryptocurrencyError(CryptocurrencyError.ReceiverNotFound)
 
         amount = transaction.amount  # type: ignore
 
         if sender.balance < amount:
+            LOGGER.debug(
+                "TX create_wallet: insufficient amount (has %s, attempt to transfer %s)", sender.balance, amount
+            )
             raise CryptocurrencyError(CryptocurrencyError.InsufficientCurrencyAmount)
 
         sender.balance -= amount
         receiver.balance += amount
 
-        print(f"Transfer between wallets: {sender.name} => {receiver.name}")
+        LOGGER.debug(
+            "Transfer between wallets: %s => %s completed (transferred %s tokens)", sender.name, receiver.name, amount
+        )
 
         wallets[from_key] = sender
         wallets[to_key] = receiver
@@ -168,10 +188,12 @@ class CryptocurrencyApi(ServiceApi):
     @staticmethod
     async def get_wallet(context: ServiceApiContext, wallet_id: str) -> Optional[Dict]:
         """Endpoing for getting a single wallet."""
+        LOGGER.debug("API: Get wallet API request for wallet %s", wallet_id)
 
         try:
             key = WalletKey(PublicKey(bytes.fromhex(wallet_id)))
         except ValueError:
+            LOGGER.debug("API: Unable to parse public key from %s", wallet_id)
             return None
 
         schema = Cryptocurrency.schema(context.instance_name, context.snapshot)
@@ -180,9 +202,12 @@ class CryptocurrencyApi(ServiceApi):
 
         wallet = wallets.get(key)
         if wallet is None:
+            LOGGER.debug("API: Wallet %s not found", wallet_id)
             return {"error": "Wallet not found"}
 
-        return {"pub_key": wallet.pub_key.hex(), "name": wallet.name, "balance": wallet.balance}
+        result = {"pub_key": wallet.pub_key.hex(), "name": wallet.name, "balance": wallet.balance}
+        LOGGER.debug("API: Wallet %s found, returning %s", wallet_id, result)
+        return result
 
     def public_endpoints(self) -> Dict[str, Dict[str, Any]]:
         # Wallet endpoint accepts only 32-byte hex value as string.

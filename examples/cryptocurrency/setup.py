@@ -20,6 +20,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/popzxc/exonum-python-backend",
     packages=setuptools.find_packages(),
+    include_package_data=True,
     install_requires=INSTALL_REQUIRES,
     python_requires=PYTHON_REQUIRES,
     classifiers=[
