@@ -5,6 +5,7 @@ import os
 import sys
 import importlib
 import logging
+import traceback
 
 from exonum_runtime.crypto import Hash
 from exonum_runtime.proto import PythonArtifactSpec
@@ -126,6 +127,7 @@ class Artifact:
             service_module = importlib.import_module(self.spec.service_library_name)
             return service_module
         except (ModuleNotFoundError, ImportError):
+            self._logger.warning("Artifact load exception traceback:\n%s", traceback.format_exc())
             return None
 
     def _get_service_class_from_module(self, service_module: Any) -> Optional[Type[Service]]:
