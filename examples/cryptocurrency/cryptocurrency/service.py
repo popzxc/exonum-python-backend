@@ -14,7 +14,7 @@ from exonum_runtime.runtime.transaction_context import TransactionContext
 from exonum_runtime.runtime.types import ArtifactProtobufSpec
 
 # Merkledb types
-from exonum_runtime.merkledb.indices import ProofMapIndex
+from exonum_runtime.merkledb.indices import MapIndex
 from exonum_runtime.merkledb.schema import Schema, WithSchema
 from exonum_runtime.merkledb.into_bytes import IntoBytes
 from exonum_runtime.merkledb.types import Fork
@@ -77,14 +77,14 @@ class CryptocurrencyError(ServiceError):
 class CryptocurrencySchema(Schema):
     """Schema for Cryptocurrency service."""
 
-    wallets: ProofMapIndex[WalletKey, Wallet]
+    wallets: MapIndex[WalletKey, Wallet]
 
 
 class Cryptocurrency(Service, WithSchema):
     """Simple cryptocurrency service"""
 
     _schema_ = CryptocurrencySchema
-    _state_hash_: List[str] = ["wallets"]
+    _state_hash_: List[str] = []
 
     def initialize(
         self, fork: Fork, config: service_pb2.Config  # type: ignore
