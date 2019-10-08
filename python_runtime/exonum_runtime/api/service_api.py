@@ -27,6 +27,14 @@ class ServiceApiContext(NamedTuple):
     instance_name: str
 
 
+class ServiceApiProvider(metaclass=abc.ABCMeta):
+    """Implementors of that interface can provide a state of service APIs."""
+
+    @abc.abstractmethod
+    def service_api_map(self) -> Dict[str, "ServiceApi"]:
+        """Return the mapping `instance_name` => `ServiceApi`."""
+
+
 # Pylint isn't a friend of Tornado as it seems
 # pylint: disable=abstract-method
 
@@ -193,8 +201,18 @@ class ServiceApi(metaclass=abc.ABCMeta):
 
         # `start` is somewhat `__init__`
         # pylint: disable=attribute-defined-outside-init
+        self._api_map = {
+            "public_port": public_port,
+            "private_port": private_port,
+            "public_api": list(map(lambda x: x[0], public_api_routes)),
+            "private_api": list(map(lambda x: x[0], private_api_routes)),
+        }
         self._public_api = public_api_server
         self._private_api = private_api_server
+
+    def api_map(self) -> Dict[str, Any]:
+        """Returns an api map for current service"""
+        return self._api_map
 
     async def stop(self) -> Tuple[Awaitable[None], Awaitable[None]]:
         """Stops the api. Returns two awaitable object correspoinding to

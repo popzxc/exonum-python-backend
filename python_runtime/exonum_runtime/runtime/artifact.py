@@ -93,8 +93,12 @@ class Artifact:
         tarball_path = os.path.join(in_dir, self.spec.source_wheel_name)
 
         # Verify hash.
-        with open(tarball_path, "rb") as raw_file:
-            raw_file_content = raw_file.read()
+        try:
+            with open(tarball_path, "rb") as raw_file:
+                raw_file_content = raw_file.read()
+        except FileNotFoundError:
+            self._logger.error("Requested artifact is not uploaded")
+            return False
 
         file_hash = Hash.hash_data(raw_file_content)
         if file_hash != self.spec.expected_hash:

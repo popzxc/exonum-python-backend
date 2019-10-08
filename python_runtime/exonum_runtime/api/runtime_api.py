@@ -14,11 +14,14 @@ from tornado.escape import json_encode
 
 from exonum_runtime.crypto import Hash
 
+from .service_api import ServiceApiProvider
+
 
 class RuntimeApiConfig(NamedTuple):
     """Configuration of the API"""
 
     artifact_wheels_path: str
+    api_provider: ServiceApiProvider
 
 
 # Pylint isn't a friend of Tornado as it seems
@@ -26,11 +29,23 @@ class RuntimeApiConfig(NamedTuple):
 
 
 class _State(tornado.web.RequestHandler):
+    # pylint: disable=attribute-defined-outside-init
+    def initialize(self, config: RuntimeApiConfig) -> None:
+        """Store the runtime."""
+        self._config = config
+
     async def get(self) -> None:
         """State handler."""
 
+        api_map = self._config.api_provider.service_api_map()
+
+        api_map_dict: Dict[str, Dict[str, List[str]]] = dict()
+
+        for instance_name, instance_api_map in api_map.items():
+            api_map_dict[instance_name] = instance_api_map.api_map()
+
         # TODO provide more helpful information
-        self.write({"state": "operating"})
+        self.write({"state": "operating", "service_api": api_map_dict})
 
 
 class _Artifact(tornado.web.RequestHandler):

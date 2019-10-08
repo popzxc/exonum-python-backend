@@ -7,11 +7,13 @@ import sys
 import logging
 
 # Uncategorized imports
-from exonum_runtime.api.service_api import ServiceApi, ServiceApiContext
-from exonum_runtime.api.runtime_api import RuntimeApi, RuntimeApiConfig
 from exonum_runtime.proto import PythonArtifactSpec, ParseError
 from exonum_runtime.interfaces import Named
 from exonum_runtime.crypto import Hash
+
+# API
+from exonum_runtime.api.service_api import ServiceApi, ServiceApiContext, ServiceApiProvider
+from exonum_runtime.api.runtime_api import RuntimeApi, RuntimeApiConfig
 
 # FFI
 from exonum_runtime.ffi.c_callbacks import build_callbacks
@@ -45,7 +47,7 @@ from .transaction_context import TransactionContext
 from .runtime_schema import PythonRuntimeSchema
 
 
-class PythonRuntime(RuntimeInterface, Named, WithSchema):
+class PythonRuntime(RuntimeInterface, Named, WithSchema, ServiceApiProvider):
     """TODO"""
 
     _schema_ = PythonRuntimeSchema
@@ -65,10 +67,9 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         self._instances: Dict[InstanceId, Service] = {}
 
         # API section
-        api_config = RuntimeApiConfig(artifact_wheels_path=self._configuration.artifacts_sources_folder)
+        api_config = RuntimeApiConfig(self._configuration.artifacts_sources_folder, self)
         self._api_snapshot = Snapshot(self._rust_ffi.snapshot_token())
         self._api_snapshot.set_always_valid()
-        # TODO
         self._runtime_api = RuntimeApi(port=self._configuration.runtime_api_port, config=api_config)
         self._free_service_port = self._configuration.service_api_ports_start
         self._service_api: Dict[str, ServiceApi] = dict()
@@ -94,8 +95,6 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         # Add built artifacts folder to the path.
         sys.path.append(built_artifacts_folder)
 
-        print("")
-
         # If this is a re-launch, dispatcher will init all the services,
         # we don't have to do it manually.
 
@@ -110,6 +109,26 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
 
         # Service is removed from pending deployments no matter how deployment ended.
         del self._pending_deployments[result.artifact_id]
+
+    def _start_service_api(self, service_instance: Service) -> None:
+        instance_name = service_instance.instance_name()
+
+        self._logger.debug("Starting service api for instance %s", instance_name)
+        instance_api = service_instance.wire_api()
+        if instance_api is not None:
+            if not isinstance(instance_api, ServiceApi):
+                # Service returned not an API object.
+                raise ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
+
+            public_port = self._free_service_port
+            private_port = self._free_service_port + 1
+            self._free_service_port += 2
+
+            context = ServiceApiContext(self._api_snapshot, instance_name)
+
+            self._service_api[instance_name] = instance_api
+
+            self._loop.create_task(instance_api.start(context, public_port, private_port))
 
     # Implementation of Named.
 
@@ -134,8 +153,6 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
 
         self._loop.create_task(artifact.deploy(deploy_future))
 
-        # self._loop.run_until_complete(deploy_future)
-
         self._pending_deployments[artifact_id] = artifact
 
         return PythonRuntimeResult.OK
@@ -144,22 +161,27 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         return artifact_id in self._artifacts
 
     def start_instance(self, instance_spec: InstanceSpec) -> PythonRuntimeResult:
-        self._logger.info("Received start instance request for instance %s", instance_spec)
+        self._logger.info("Starting instance %s", instance_spec)
         artifact_id = instance_spec.artifact
         if not self.is_artifact_deployed(artifact_id):
+            self._logger.error("Request to start not deployed service: %s", instance_spec)
             return PythonRuntimeResult.UNKNOWN_SERVICE
 
         artifact = self._artifacts[artifact_id]
         self._started_services[instance_spec.instance_id] = (artifact, instance_spec)
 
+        self._logger.info("Successfully started instance %s", instance_spec)
         return PythonRuntimeResult.OK
 
     def initialize_service(
         self, access: RawIndexAccess, instance: InstanceDescriptor, parameters: bytes
     ) -> Union[PythonRuntimeResult, ServiceError]:
+        self._logger.info("Initializing service: %s", instance)
+
         instance_id = instance.instance_id
         if instance_id not in self._started_services:
             # Service is attempted to initialize but not started.
+            self._logger.error("Request to initialize not started service: %s", instance)
             return PythonRuntimeResult.UNKNOWN_SERVICE
 
         with Fork(access) as fork:
@@ -175,20 +197,9 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
 
                 self._instances[instance_id] = service_instance
 
-                # Start service API (TODO move into separate function)
-                instance_name = service_instance.instance_name()
-                instance_api = service_instance.wire_api()
-                if instance_api is not None:
-                    # TODO check received class
-                    public_port = self._free_service_port
-                    private_port = self._free_service_port + 1
-                    self._free_service_port += 2
+                self._start_service_api(service_instance)
 
-                    context = ServiceApiContext(self._api_snapshot, instance_name)
-
-                    self._service_api[instance_name] = instance_api
-
-                    self._loop.create_task(instance_api.start(context, public_port, private_port))
+                self._logger.info("Successfully initialized service: %s", instance)
 
                 return PythonRuntimeResult.OK
             except ServiceError as error:
@@ -198,28 +209,36 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
             # Services are untrusted code, so we have to supress all the exceptions.
             except Exception as error:  # pylint: disable=broad-except
                 # Indicate that service isn't OK.
-                self._logger.debug("Initialize service error (emitted by runtime): %s", error)
+                self._logger.error("Initialize service error (emitted by runtime): %s", error)
                 return ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
 
     def stop_service(self, instance: InstanceDescriptor) -> PythonRuntimeResult:
         instance_id = instance.instance_id
+        self._logger.info("Received request to stop instance %s", instance)
 
         if instance_id not in self._instances:
+            self._logger.error("Received request to stop instance %s which is not running", instance)
             return PythonRuntimeResult.UNKNOWN_SERVICE
 
         self._stop_service(instance_id)
 
         return PythonRuntimeResult.OK
 
-    def _stop_service(self, instance_id: InstanceId) -> None:
+    def _stop_service(self, instance_id: InstanceId, force: bool = True) -> None:
+        if force:
+            self._logger.info("Stopping service instance %s due to unallowed error raised", instance_id)
+        else:
+            self._logger.info("Stopping service instance %s", instance_id)
+
         try:
             self._instances[instance_id].stop()
         # Services are untrusted code, so we have to supress all the exceptions.
-        except Exception:  # pylint: disable=broad-except
+        except Exception as error:  # pylint: disable=broad-except
             # If service didn't stop successfully, we don't care. We're removing it anyway.
-            pass
+            self._logger.debug("Stop service error (emitted by runtime): %s. Service will be disabled anyway", error)
 
         del self._instances[instance_id]
+        self._logger.debug("Stopped service instance %s", instance_id)
 
     def execute(
         self, context: ExecutionContext, call_info: CallInfo, arguments: bytes
@@ -227,6 +246,7 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         instance_id = call_info.instance_id
 
         if instance_id not in self._instances:
+            self._logger.error("Received execute request for service %s which is not running", instance_id)
             return PythonRuntimeResult.UNKNOWN_SERVICE
 
         with Fork(context.access) as fork:
@@ -239,11 +259,13 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
                 return PythonRuntimeResult.OK
             except ServiceError as error:
                 # Services are allowed to raise ServiceError to indicate that input data isn't valid.
+                self._logger.debug("Execute service error (emitted by service): %s", error)
                 return error
             # Services are untrusted code, so we have to supress all the exceptions.
-            except Exception:  # pylint: disable=broad-except
+            except Exception as error:  # pylint: disable=broad-except
                 # Indicate that service isn't OK and remove it from the running instances.
-                self._stop_service(instance_id)
+                self._logger.warning("Execute service error (emitted by runtime): %s", error)
+                self._stop_service(instance_id, force=True)
                 return ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
 
     def artifact_protobuf_spec(self, artifact: ArtifactId) -> Optional[ArtifactProtobufSpec]:
@@ -271,13 +293,15 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
         for instance_id, instance in self._instances.items():
             try:
                 state_hashes = instance.state_hashes(snapshot)
-            except Exception:  # pylint: disable=broad-except
+            except Exception as error:  # pylint: disable=broad-except
                 # Remove service from the running instances and skip it.
+                self._logger.warning("State hash service error (emitted by runtime): %s", error)
                 self._stop_service(instance_id)
                 continue
 
             # Check that service returned what we expected.
             if not isinstance(state_hashes, list) or not all(map(lambda x: isinstance(x, Hash), state_hashes)):
+                self._logger.warning("Service %s returned incorrect object instead of state hashes", instance_id)
                 self._stop_service(instance_id)
                 continue
 
@@ -292,8 +316,9 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
             for instance_id, instance in self._instances.items():
                 try:
                     instance.before_commit(fork)
-                except Exception:  # pylint: disable=broad-except
+                except Exception as error:  # pylint: disable=broad-except
                     # Remove service from the running instances and skip it.
+                    self._logger.warning("Service %s errored with an error %s during before_commit", instance_id, error)
                     self._stop_service(instance_id)
                     continue
 
@@ -304,7 +329,13 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema):
             for instance_id, instance in self._instances.items():
                 try:
                     instance.after_commit(snapshot)
-                except Exception:  # pylint: disable=broad-except
+                except Exception as error:  # pylint: disable=broad-except
                     # Remove service from the running instances and skip it.
+                    self._logger.warning("Service %s errored with an error %s during after_commit", instance_id, error)
                     self._stop_service(instance_id)
                     continue
+
+    # Implementation of ServiceApiProvider
+    def service_api_map(self) -> Dict[str, ServiceApi]:
+        """Returns a dict of currently running service APIs."""
+        return self._service_api
