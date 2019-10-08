@@ -11,7 +11,21 @@ cd cryptocurrency/proto
 protoc --proto_path=. --python_out=. helpers.proto service.proto
 ```
 
-To create a deployable artifact, then just run:
+After that open `service.proto` and change line:
+
+```python
+import helpers_pb2 as helpers__pb2
+```
+
+to
+
+```python
+from . import helpers_pb2 as helpers__pb2
+```
+
+(thanks to high quality protobuf code generation)
+
+Finally, to create a deployable artifact, then just run:
 
 ```sh
 python3 setup.py sdist
