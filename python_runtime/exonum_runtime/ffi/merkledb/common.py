@@ -15,11 +15,10 @@ class BinaryData(c.Structure):
 
         if self.data:
             result: Optional[bytes] = bytes(self.data[: self.data_len])
+            # BinaryData objects are allocated dynamically by mekledb, so we have to
+            # free allocated memory.
+            free_merkledb_allocated()
         else:
             result = None
-
-        # BinaryData objects are allocated dynamically by mekledb, so we have to
-        # free allocated memory.
-        free_merkledb_allocated()
 
         return result

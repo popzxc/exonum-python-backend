@@ -92,11 +92,11 @@ def stop_service(descriptor):  # type: ignore # Signature is one line above.
 
 
 @c.CFUNCTYPE(c.c_uint8, RawExecutionContext, RawCallInfo, c.POINTER(c.c_uint8), c.c_uint32)
-def execute(raw_call_info, raw_context, parameters, parameters_len):  # type: ignore # Signature is one line above.
+def execute(raw_context, raw_call_info, parameters, parameters_len):  # type: ignore # Signature is one line above.
     """Execute a transaction."""
     call_info = raw_call_info.into_call_info()
 
-    parameters_bytes = bytes((c.c_ubyte * parameters_len.value).from_buffer(parameters)[:])
+    parameters_bytes = bytes(parameters[:parameters_len])
 
     context = raw_context.into_execution_context()
 
@@ -147,7 +147,7 @@ def artifact_protobuf_spec(raw_artifact_id, spec_ptr):  # type: ignore # Signatu
     else:
         raw_spec_ptr = None
 
-    spec_ptr.content = raw_spec_ptr
+    spec_ptr[0] = raw_spec_ptr
 
 
 @c.CFUNCTYPE(None, c.c_void_p)
@@ -182,7 +182,7 @@ def free_resource(resource):  # type: ignore # Signature is one line above.
 
     # TODO probably not work
     # _RESOURCES.remove(resource)
-    del _RESOURCES[resource.value]
+    del _RESOURCES[resource]
 
 
 def free_merkledb_allocated() -> None:

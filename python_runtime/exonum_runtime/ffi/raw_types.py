@@ -193,7 +193,9 @@ class RawArtifactProtobufSpec(c.Structure):
     def from_artifact_protobuf_spec(cls, spec: ArtifactProtobufSpec) -> "RawArtifactProtobufSpec":
         """Converts ArtifactProtobufSpec into C representation."""
 
-        files_iter = map(lambda f: RawProtoSourceFile(name=f.name, content=f.content), spec.sources)
+        files_iter = map(
+            lambda f: RawProtoSourceFile(name=bytes(f.name, "utf-8"), content=bytes(f.content, "utf-8")), spec.sources
+        )
         raw_files = (RawProtoSourceFile * len(spec.sources))(*list(files_iter))
 
         return cls(files=raw_files, files_amount=len(spec.sources))
