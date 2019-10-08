@@ -179,8 +179,6 @@ def after_commit(access):  # type: ignore # Signature is one line above.
 def free_resource(resource):  # type: ignore # Signature is one line above.
     """Callback called when resource is consumed and can be freed."""
 
-    # TODO probably not work
-    # _RESOURCES.remove(resource)
     del _RESOURCES[resource]
 
 
