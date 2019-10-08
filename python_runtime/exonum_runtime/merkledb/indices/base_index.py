@@ -147,7 +147,7 @@ class BaseIndex(metaclass=_BaseIndexMeta):
 
         self._initialized = False
 
-    def __call__(self, family: Optional[str]) -> "BaseIndex":
+    def __call__(self, family: Optional[str] = None) -> "BaseIndex":
         """Initializes the index and sets the index family if provided."""
         if family is None:
             self._index_id = bytes(f"{self._instance_name}.{self._index_name}", "utf-8")
