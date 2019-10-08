@@ -24,6 +24,12 @@ class _TransactionRoute(NamedTuple):
     # Name of the class in the `service.proto` to be used for argument deserialization.
     deserializer: str
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, _TransactionRoute):
+            return NotImplemented
+
+        return self.handler.__name__ == other.handler.__name__ and self.deserializer == other.deserializer
+
 
 class Service(Named, metaclass=abc.ABCMeta):
     """Base interface for every Exonum Python service.
@@ -71,7 +77,7 @@ class Service(Named, metaclass=abc.ABCMeta):
     TODO: Implementation of `wire_api` method is not listed.
     """
 
-    __routing_table: Dict[int, _TransactionRoute] = dict()
+    __routing_table: Dict[str, Dict[int, _TransactionRoute]] = dict()
 
     def __init__(self, module_name: str, fork: Fork, name: str, config: bytes):
         self.__instance_name = name
@@ -132,7 +138,7 @@ class Service(Named, metaclass=abc.ABCMeta):
 
     @no_type_check
     @classmethod
-    def transaction(cls, tx_id: int, tx_name: str):
+    def transaction(cls, service: str, tx_id: int, tx_name: str):
         """Decorator to denote transaction handler.
 
         Usage:
@@ -159,10 +165,19 @@ class Service(Named, metaclass=abc.ABCMeta):
         TransactionHandler = Callable[["Service", TransactionContext, Any], None]
 
         def decorator(func: TransactionHandler) -> TransactionHandler:
-            if tx_id in cls.__routing_table:
-                raise RuntimeError(f"Redefinition of transaction with id {tx_id} for service class {cls.__name__}")
+            if not service in cls.__routing_table:
+                cls.__routing_table[service] = dict()
 
-            cls.__routing_table[tx_id] = _TransactionRoute(handler=func, deserializer=tx_name)
+            route = _TransactionRoute(handler=func, deserializer=tx_name)
+
+            if tx_id in cls.__routing_table[service]:
+                if cls.__routing_table[service][tx_id] == route:
+                    # Already registered, do nothing
+                    return func
+
+                raise RuntimeError(f"Redefinition of transaction with id {tx_id} for service class {service}")
+
+            cls.__routing_table[service][tx_id] = route
             return func
 
         return decorator
@@ -172,8 +187,12 @@ class Service(Named, metaclass=abc.ABCMeta):
 
         In case of execution error service should raise an subclass of
         ServiceError exception."""
+        service_name = type(self).__name__
 
-        tx_route = self.__routing_table.get(method_id)
+        if service_name not in self.__routing_table:
+            raise ServiceError(GenericServiceError.METHOD_NOT_FOUND.value)
+
+        tx_route = self.__routing_table[service_name].get(method_id)
 
         if tx_route is None:
             # Unknown method.

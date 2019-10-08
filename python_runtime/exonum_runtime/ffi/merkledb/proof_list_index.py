@@ -17,16 +17,14 @@ class RawProofListIndex(c.Structure):
 class RawProofListIndexMethods(c.Structure):
     """TODO"""
 
-    AllocateFunctype = c.CFUNCTYPE(c.POINTER(c.c_uint8), c.c_uint64)
-
     _fields_ = [
-        ("get", c.CFUNCTYPE(BinaryData, c.POINTER(RawProofListIndex), c.c_uint64, AllocateFunctype)),
+        ("get", c.CFUNCTYPE(BinaryData, c.POINTER(RawProofListIndex), c.c_uint64, c.c_void_p)),
         ("push", c.CFUNCTYPE(None, c.POINTER(RawProofListIndex), BinaryData)),
-        # ("pop", c.CFUNCTYPE(BinaryData, c.POINTER(RawProofListIndex), AllocateFunctype)),
+        # ("pop", c.CFUNCTYPE(BinaryData, c.POINTER(RawProofListIndex), c.c_void_p)),
         ("len", c.CFUNCTYPE(c.c_uint64, c.POINTER(RawProofListIndex))),
         ("set_item", c.CFUNCTYPE(None, c.POINTER(RawProofListIndex), c.c_uint64, BinaryData)),
         ("clear", c.CFUNCTYPE(None, c.POINTER(RawProofListIndex))),
-        ("object_hash", c.CFUNCTYPE(BinaryData, c.POINTER(RawProofListIndex), AllocateFunctype)),
+        ("object_hash", c.CFUNCTYPE(BinaryData, c.POINTER(RawProofListIndex), c.c_void_p)),
     ]
 
 
@@ -41,7 +39,7 @@ class ProofListIndexWrapper:
 
     def get(self, idx: int) -> Optional[bytes]:
         """TODO"""
-        result = self._inner.methods.get(self._inner, c.c_uint64(idx), merkledb_allocate)
+        result = self._inner.methods.get(self._inner, c.c_uint64(idx), c.cast(merkledb_allocate, c.c_void_p))
 
         return result.into_bytes()
 
@@ -54,7 +52,7 @@ class ProofListIndexWrapper:
 
     # def pop(self) -> Optional[bytes]:
     #     """TODO"""
-    #     result = self._inner.methods.pop(self._inner, allocate)
+    #     result = self._inner.methods.pop(self._inner, c.cast(merkledb_allocate, c.c_void_p))
 
     #     return result.into_bytes()
 
@@ -77,6 +75,6 @@ class ProofListIndexWrapper:
     def object_hash(self) -> Hash:
         """TODO"""
 
-        result = self._inner.methods.object_hash(self._inner, merkledb_allocate)
+        result = self._inner.methods.object_hash(self._inner, c.cast(merkledb_allocate, c.c_void_p))
 
         return Hash(result.into_bytes())

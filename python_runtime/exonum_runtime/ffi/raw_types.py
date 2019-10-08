@@ -104,7 +104,7 @@ class RawCallInfo(c.Structure):
 class RawHash(c.Structure):
     """C representation of the hash."""
 
-    _fields_ = [("data", c.c_uint8 * 32)]
+    _fields_ = [("data", c.POINTER(c.c_uint8))]
 
     @classmethod
     def from_hash(cls, value: Hash) -> "RawHash":

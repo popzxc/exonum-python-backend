@@ -5,6 +5,7 @@ from typing import Dict, Optional, Tuple, Union, List
 import os
 import sys
 import logging
+import traceback
 
 # Uncategorized imports
 from exonum_runtime.proto import PythonArtifactSpec, ParseError
@@ -209,7 +210,8 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema, ServiceApiProvider):
             # Services are untrusted code, so we have to supress all the exceptions.
             except Exception as error:  # pylint: disable=broad-except
                 # Indicate that service isn't OK.
-                self._logger.error("Initialize service error (emitted by runtime): %s", error)
+                self._logger.warning("Initialize service error (emitted by runtime): %s", error)
+                self._logger.warning("Exception traceback:\n%s", traceback.format_exc())
                 return ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
 
     def stop_service(self, instance: InstanceDescriptor) -> PythonRuntimeResult:
@@ -235,7 +237,8 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema, ServiceApiProvider):
         # Services are untrusted code, so we have to supress all the exceptions.
         except Exception as error:  # pylint: disable=broad-except
             # If service didn't stop successfully, we don't care. We're removing it anyway.
-            self._logger.debug("Stop service error (emitted by runtime): %s. Service will be disabled anyway", error)
+            self._logger.warning("Stop service error (emitted by runtime): %s. Service will be disabled anyway", error)
+            self._logger.warning("Exception traceback:\n%s", traceback.format_exc())
 
         del self._instances[instance_id]
         self._logger.debug("Stopped service instance %s", instance_id)
@@ -265,6 +268,7 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema, ServiceApiProvider):
             except Exception as error:  # pylint: disable=broad-except
                 # Indicate that service isn't OK and remove it from the running instances.
                 self._logger.warning("Execute service error (emitted by runtime): %s", error)
+                self._logger.warning("Exception traceback:\n%s", traceback.format_exc())
                 self._stop_service(instance_id, force=True)
                 return ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
 
@@ -285,27 +289,34 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema, ServiceApiProvider):
 
     def state_hashes(self, access: RawIndexAccess) -> StateHashAggregator:
 
-        snapshot = Snapshot(access)
-        runtime = self.get_state_hashes(snapshot)
+        with Snapshot(access) as snapshot:
+            assert isinstance(snapshot, Snapshot)
+            runtime = self.get_state_hashes(snapshot)
 
-        instances = []
+            instances = []
+            to_stop = []
 
-        for instance_id, instance in self._instances.items():
-            try:
-                state_hashes = instance.state_hashes(snapshot)
-            except Exception as error:  # pylint: disable=broad-except
-                # Remove service from the running instances and skip it.
-                self._logger.warning("State hash service error (emitted by runtime): %s", error)
+            for instance_id, instance in self._instances.items():
+                try:
+                    state_hashes = instance.state_hashes(snapshot)
+                except Exception as error:  # pylint: disable=broad-except
+                    # Remove service from the running instances and skip it.
+                    self._logger.warning("State hash service error (emitted by runtime): %s", error)
+                    self._logger.warning("Exception traceback:\n%s", traceback.format_exc())
+                    to_stop.append(instance_id)
+                    continue
+
+                # Check that service returned what we expected.
+                if not isinstance(state_hashes, list) or not all(map(lambda x: isinstance(x, Hash), state_hashes)):
+                    self._logger.warning("Service %s returned incorrect object instead of state hashes", instance_id)
+                    to_stop.append(instance_id)
+                    continue
+
+                instances.append((instance_id, state_hashes))
+
+            for instance_id in to_stop:
+                # Stop failed instances.
                 self._stop_service(instance_id)
-                continue
-
-            # Check that service returned what we expected.
-            if not isinstance(state_hashes, list) or not all(map(lambda x: isinstance(x, Hash), state_hashes)):
-                self._logger.warning("Service %s returned incorrect object instead of state hashes", instance_id)
-                self._stop_service(instance_id)
-                continue
-
-            instances.append((instance_id, state_hashes))
 
         return StateHashAggregator(runtime, instances)
 
@@ -313,18 +324,26 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema, ServiceApiProvider):
         with Fork(access) as fork:
             assert isinstance(fork, Fork)
 
+            to_stop = []
+
             for instance_id, instance in self._instances.items():
                 try:
                     instance.before_commit(fork)
                 except Exception as error:  # pylint: disable=broad-except
                     # Remove service from the running instances and skip it.
                     self._logger.warning("Service %s errored with an error %s during before_commit", instance_id, error)
-                    self._stop_service(instance_id)
+                    to_stop.append(instance_id)
                     continue
+
+            for instance_id in to_stop:
+                # Stop failed instances.
+                self._stop_service(instance_id)
 
     def after_commit(self, access: RawIndexAccess) -> None:
         with Snapshot(access) as snapshot:
             assert isinstance(snapshot, Snapshot)
+
+            to_stop = []
 
             for instance_id, instance in self._instances.items():
                 try:
@@ -332,8 +351,12 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema, ServiceApiProvider):
                 except Exception as error:  # pylint: disable=broad-except
                     # Remove service from the running instances and skip it.
                     self._logger.warning("Service %s errored with an error %s during after_commit", instance_id, error)
-                    self._stop_service(instance_id)
+                    to_stop.append(instance_id)
                     continue
+
+            for instance_id in to_stop:
+                # Stop failed instances.
+                self._stop_service(instance_id)
 
     # Implementation of ServiceApiProvider
     def service_api_map(self) -> Dict[str, ServiceApi]:

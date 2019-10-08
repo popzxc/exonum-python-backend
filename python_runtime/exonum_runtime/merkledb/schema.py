@@ -96,7 +96,7 @@ class _WithSchemaMeta(abc.ABCMeta):
             if getattr(schema, "_schema_meta").get(item) is None:
                 raise AttributeError(f"Item '{item}' is not a part of defined _schema_")
 
-            if getattr(schema, "_schema_meta")[item] not in (ProofListIndex, ProofMapIndex):
+            if not getattr(schema, "_schema_meta")[item].__name__ in ("ProofListIndex", "ProofMapIndex"):
                 raise AttributeError(f"Item '{item}' is not a Proof*Index")
 
 

@@ -14,7 +14,7 @@ from exonum_runtime.runtime.transaction_context import TransactionContext
 from exonum_runtime.runtime.types import ArtifactProtobufSpec
 
 # Merkledb types
-from exonum_runtime.merkledb.indices import MapIndex
+from exonum_runtime.merkledb.indices import ProofMapIndex
 from exonum_runtime.merkledb.schema import Schema, WithSchema
 from exonum_runtime.merkledb.into_bytes import IntoBytes
 from exonum_runtime.merkledb.types import Fork
@@ -77,14 +77,14 @@ class CryptocurrencyError(ServiceError):
 class CryptocurrencySchema(Schema):
     """Schema for Cryptocurrency service."""
 
-    wallets: MapIndex[WalletKey, Wallet]
+    wallets: ProofMapIndex[WalletKey, Wallet]
 
 
 class Cryptocurrency(Service, WithSchema):
     """Simple cryptocurrency service"""
 
     _schema_ = CryptocurrencySchema
-    _state_hash_: List[str] = []
+    _state_hash_: List[str] = ["wallets"]
 
     def initialize(
         self, fork: Fork, config: service_pb2.Config  # type: ignore
@@ -92,7 +92,7 @@ class Cryptocurrency(Service, WithSchema):
         # No initialization required.
         pass
 
-    @Service.transaction(tx_id=1, tx_name="TxCreateWallet")
+    @Service.transaction("Cryptocurrency", tx_id=1, tx_name="TxCreateWallet")
     def create_wallet(
         self, context: TransactionContext, transaction: service_pb2.TxCreateWallet  # type: ignore
     ) -> None:
@@ -122,7 +122,7 @@ class Cryptocurrency(Service, WithSchema):
             LOGGER.debug("TX create_wallet: wallet already exists")
             raise CryptocurrencyError(CryptocurrencyError.WalletAlreadyExists)
 
-    @Service.transaction(tx_id=2, tx_name="TxTransfer")
+    @Service.transaction("Cryptocurrency", tx_id=2, tx_name="TxTransfer")
     def transfer(
         self, context: TransactionContext, transaction: service_pb2.TxTransfer  # type: ignore
     ) -> None:

@@ -243,14 +243,14 @@ impl Runtime for PythonRuntime {
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
         unsafe {
-            let raw_state_hash_aggregator_ptr: *mut RawStateHashAggregator =
+            let mut raw_state_hash_aggregator_ptr: *mut RawStateHashAggregator =
                 std::ptr::null::<RawStateHashAggregator>() as *mut RawStateHashAggregator;
 
             let access = RawIndexAccess::Snapshot(snapshot);
 
             (python_interface.methods.state_hashes)(
                 &access as *const RawIndexAccess,
-                &raw_state_hash_aggregator_ptr as *const *mut RawStateHashAggregator,
+                &mut raw_state_hash_aggregator_ptr as *mut *mut RawStateHashAggregator,
             );
 
             // Check agains nullptr just in case.

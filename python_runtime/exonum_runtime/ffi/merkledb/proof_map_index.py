@@ -17,14 +17,12 @@ class RawProofMapIndex(c.Structure):
 class RawProofMapIndexMethods(c.Structure):
     """TODO"""
 
-    AllocateFunctype = c.CFUNCTYPE(c.POINTER(c.c_uint8), c.c_uint64)
-
     _fields_ = [
-        ("get", c.CFUNCTYPE(BinaryData, c.POINTER(RawProofMapIndex), BinaryData, AllocateFunctype)),
+        ("get", c.CFUNCTYPE(BinaryData, c.POINTER(RawProofMapIndex), BinaryData, c.c_void_p)),
         ("put", c.CFUNCTYPE(None, c.POINTER(RawProofMapIndex), BinaryData, BinaryData)),
         ("remove", c.CFUNCTYPE(None, c.POINTER(RawProofMapIndex), BinaryData)),
         ("clear", c.CFUNCTYPE(c.c_uint64, c.POINTER(RawProofMapIndex))),
-        ("object_hash", c.CFUNCTYPE(BinaryData, c.POINTER(RawProofMapIndex), AllocateFunctype)),
+        ("object_hash", c.CFUNCTYPE(BinaryData, c.POINTER(RawProofMapIndex), c.c_void_p)),
     ]
 
 
@@ -41,7 +39,7 @@ class ProofMapIndexWrapper:
         """TODO"""
         # mypy isn't a friend of ctypes
         key = BinaryData(c.cast(key, c.POINTER(c.c_uint8)), c.c_uint64(len(key)))  # type: ignore
-        result = self._inner.methods.get(self._inner, key, merkledb_allocate)
+        result = self._inner.methods.get(self._inner, key, c.cast(merkledb_allocate, c.c_void_p))
 
         return result.into_bytes()
 
@@ -66,6 +64,6 @@ class ProofMapIndexWrapper:
     def object_hash(self) -> Hash:
         """TODO"""
 
-        result = self._inner.methods.object_hash(self._inner, merkledb_allocate)
+        result = self._inner.methods.object_hash(self._inner, c.cast(merkledb_allocate, c.c_void_p))
 
         return Hash(result.into_bytes())

@@ -112,7 +112,7 @@ def execute(raw_context, raw_call_info, parameters, parameters_len):  # type: ig
 
 
 @c.CFUNCTYPE(None, c.c_void_p, c.POINTER(c.POINTER(RawStateHashAggregator)))
-def state_hashes(access, state_hash_aggregator):  # type: ignore # Signature is one line above.
+def state_hashes(access, state_hash_aggregator_ptr):  # type: ignore # Signature is one line above.
     """Function called from Rust to retrieve state hashes."""
     ffi = RustFFIProvider.instance()
 
@@ -123,9 +123,8 @@ def state_hashes(access, state_hash_aggregator):  # type: ignore # Signature is 
 
     void_p = c.cast(raw_state_hashes_ptr, c.c_void_p)
     _RESOURCES[void_p.value] = void_p
-    # _RESOURCES.add(c.cast(raw_state_hashes_ptr, c.c_void_p))
 
-    state_hash_aggregator.content = raw_state_hashes_ptr
+    state_hash_aggregator_ptr[0] = raw_state_hashes_ptr
 
 
 @c.CFUNCTYPE(None, RawArtifactId, c.POINTER(c.POINTER(RawArtifactProtobufSpec)))
