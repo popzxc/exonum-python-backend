@@ -13,6 +13,8 @@ PYTHON_RUNTIME_ID = 2
 CRYPTOCURRENCY_ARTIFACT_NAME = "cryptocurrency"
 CRYPTOCURRENCY_INSTANCE_NAME = "xnm-token"
 
+PYTHON_RUNTIME_PORT = 8090
+
 
 def run() -> None:
     """This example creates two wallets (for Alice and Bob) and performs several
@@ -31,8 +33,8 @@ def run() -> None:
         alice_keypair = create_wallet(client, cryptocurrency_message_generator, "Alice")
         bob_keypair = create_wallet(client, cryptocurrency_message_generator, "Bob")
 
-        alice_balance = get_balance(client, alice_keypair.public_key)
-        bob_balance = get_balance(client, bob_keypair.public_key)
+        alice_balance = get_balance(alice_keypair.public_key)
+        bob_balance = get_balance(bob_keypair.public_key)
         print("Created the wallets for Alice and Bob. Balance:")
         print(f" Alice => {alice_balance}")
         print(f" Bob => {bob_balance}")
@@ -136,18 +138,23 @@ def transfer(
 
     ensure_transaction_success(client, tx_hash)
 
-    from_balance = get_balance(client, from_keypair.public_key)
-    to_balance = get_balance(client, to_key)
+    from_balance = get_balance(from_keypair.public_key)
+    to_balance = get_balance(to_key)
 
     return from_balance, to_balance
 
 
-def get_balance(client: ExonumClient, key: PublicKey) -> int:
+def get_balance(key: PublicKey) -> int:
     """The example returns the balance of the wallet."""
 
-    # Call the /wallets/info endpoint to retrieve the balance:
-    # wallet_info = client.get_service(CRYPTOCURRENCY_INSTANCE_NAME, "wallets/{}".format(key.hex()))
-    endpoint = "http://127.0.0.1:9002/wallets/{}".format(key.hex())
+    python_api_map_endpoint = "http://127.0.0.1:{}/".format(PYTHON_RUNTIME_PORT)
+    api_map = requests.get(python_api_map_endpoint)
+    ensure_status_code(api_map)
+
+    service_public_port = api_map.json()["service_api"][CRYPTOCURRENCY_INSTANCE_NAME]["public_port"]
+
+    # Call the /wallets endpoint to retrieve the balance:
+    endpoint = "http://127.0.0.1:{}/wallets/{}".format(service_public_port, key.hex())
     wallet_info = requests.get(endpoint)
     ensure_status_code(wallet_info)
     balance = wallet_info.json()["balance"]
