@@ -45,6 +45,11 @@ class ListIndex(BaseIndex):
         self._index.push(item.into_bytes())
 
     @BaseIndex.mutable
+    def append(self, item: IntoBytes) -> None:
+        """Adds an element to the ListIndex."""
+        self._index.push(item.into_bytes())
+
+    @BaseIndex.mutable
     def pop(self) -> Optional[IntoBytes]:
         """Removes the last element from the ListIndex and returns its value
         (if list became empty, None will be returned)."""
