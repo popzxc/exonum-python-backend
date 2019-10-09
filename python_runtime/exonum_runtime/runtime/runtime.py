@@ -32,7 +32,6 @@ from .types import (
     InstanceSpec,
     DeploymentResult,
     PythonRuntimeResult,
-    InstanceDescriptor,
     CallInfo,
     StateHashAggregator,
     ArtifactProtobufSpec,
@@ -161,70 +160,49 @@ class PythonRuntime(RuntimeInterface, Named, WithSchema, ServiceApiProvider):
     def is_artifact_deployed(self, artifact_id: ArtifactId) -> bool:
         return artifact_id in self._artifacts
 
-    def start_instance(self, instance_spec: InstanceSpec) -> PythonRuntimeResult:
+    def _start_service(
+        self, instance_spec: InstanceSpec, fork: Optional[Fork], parameters: Optional[bytes]
+    ) -> Union[PythonRuntimeResult, ServiceError]:
+
         self._logger.info("Starting instance %s", instance_spec)
         artifact_id = instance_spec.artifact
+        instance_id = instance_spec.instance_id
         if not self.is_artifact_deployed(artifact_id):
             self._logger.error("Request to start not deployed service: %s", instance_spec)
             return PythonRuntimeResult.UNKNOWN_SERVICE
 
         artifact = self._artifacts[artifact_id]
-        self._started_services[instance_spec.instance_id] = (artifact, instance_spec)
+        try:
+            service_class = artifact.get_service()
+            service_instance = service_class(artifact.spec.service_library_name, instance_spec.name, fork, parameters)
 
-        self._logger.info("Successfully started instance %s", instance_spec)
-        return PythonRuntimeResult.OK
+            self._instances[instance_id] = service_instance
 
-    def initialize_service(
-        self, access: RawIndexAccess, instance: InstanceDescriptor, parameters: bytes
+            self._start_service_api(service_instance)
+
+            self._logger.info("Successfully started service: %s", instance_spec)
+
+            return PythonRuntimeResult.OK
+        except ServiceError as error:
+            # Services are allowed to raise ServiceError to indicate that input data isn't valid.
+            self._logger.debug("Initialize service error (emitted by service): %s", error)
+            return error
+        # Services are untrusted code, so we have to supress all the exceptions.
+        except Exception as error:  # pylint: disable=broad-except
+            # Indicate that service isn't OK.
+            self._logger.warning("Initialize service error (emitted by runtime): %s", error)
+            self._logger.warning("Exception traceback:\n%s", traceback.format_exc())
+            return ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
+
+    def restart_instance(self, instance_spec: InstanceSpec) -> Union[PythonRuntimeResult, ServiceError]:
+        return self._start_service(instance_spec, None, None)
+
+    def add_service(
+        self, access: RawIndexAccess, instance_spec: InstanceSpec, parameters: bytes
     ) -> Union[PythonRuntimeResult, ServiceError]:
-        self._logger.info("Initializing service: %s", instance)
-
-        instance_id = instance.instance_id
-        if instance_id not in self._started_services:
-            # Service is attempted to initialize but not started.
-            self._logger.error("Request to initialize not started service: %s", instance)
-            return PythonRuntimeResult.UNKNOWN_SERVICE
-
         with Fork(access) as fork:
             assert isinstance(fork, Fork)
-            try:
-                artifact, instance_spec = self._started_services[instance_id]
-                del self._started_services[instance_id]
-
-                service_class = artifact.get_service()
-                service_instance = service_class(
-                    artifact.spec.service_library_name, fork, instance_spec.name, parameters
-                )
-
-                self._instances[instance_id] = service_instance
-
-                self._start_service_api(service_instance)
-
-                self._logger.info("Successfully initialized service: %s", instance)
-
-                return PythonRuntimeResult.OK
-            except ServiceError as error:
-                # Services are allowed to raise ServiceError to indicate that input data isn't valid.
-                self._logger.debug("Initialize service error (emitted by service): %s", error)
-                return error
-            # Services are untrusted code, so we have to supress all the exceptions.
-            except Exception as error:  # pylint: disable=broad-except
-                # Indicate that service isn't OK.
-                self._logger.warning("Initialize service error (emitted by runtime): %s", error)
-                self._logger.warning("Exception traceback:\n%s", traceback.format_exc())
-                return ServiceError(GenericServiceError.WRONG_SERVICE_IMPLEMENTATION)
-
-    def stop_service(self, instance: InstanceDescriptor) -> PythonRuntimeResult:
-        instance_id = instance.instance_id
-        self._logger.info("Received request to stop instance %s", instance)
-
-        if instance_id not in self._instances:
-            self._logger.error("Received request to stop instance %s which is not running", instance)
-            return PythonRuntimeResult.UNKNOWN_SERVICE
-
-        self._stop_service(instance_id)
-
-        return PythonRuntimeResult.OK
+            return self._start_service(instance_spec, fork, parameters)
 
     def _stop_service(self, instance_id: InstanceId, force: bool = True) -> None:
         if force:

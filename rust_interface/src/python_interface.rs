@@ -10,7 +10,7 @@ use super::{
     pending_deployment::PendingDeployment,
     types::{
         RawArtifactId, RawArtifactProtobufSpec, RawCallInfo, RawExecutionContext, RawIndexAccess,
-        RawInstanceDescriptor, RawInstanceSpec, RawStateHashAggregator,
+        RawInstanceSpec, RawStateHashAggregator,
     },
 };
 
@@ -49,14 +49,13 @@ impl PythonRuntimeInterface {
 type PythonDeployArtifactMethod =
     unsafe extern "C" fn(artifact: RawArtifactId, spec: *const u8, spec_len: u64) -> u8;
 type PythonIsArtifactDeployedMethod = unsafe extern "C" fn(artifact: RawArtifactId) -> bool;
-type PythonStartServiceMethod = unsafe extern "C" fn(spec: RawInstanceSpec) -> u8;
-type PythonInitializeServiceMethod = unsafe extern "C" fn(
+type PythonRestartServiceMethod = unsafe extern "C" fn(spec: RawInstanceSpec) -> u8;
+type PythonAddServiceMethod = unsafe extern "C" fn(
     fork: *const RawIndexAccess,
-    descriptor: RawInstanceDescriptor,
+    descriptor: RawInstanceSpec,
     parameters: *const u8,
     parameters_len: u64,
 ) -> u8;
-type PythonStopServiceMethod = unsafe extern "C" fn(descriptor: RawInstanceDescriptor) -> u8;
 type PythonExecuteMethod = unsafe extern "C" fn(
     context: RawExecutionContext,
     call_info: RawCallInfo,
@@ -79,9 +78,8 @@ type PythonFreeResourceMethod = unsafe extern "C" fn(resource: *const c_void);
 pub struct PythonMethods {
     pub deploy_artifact: PythonDeployArtifactMethod,
     pub is_artifact_deployed: PythonIsArtifactDeployedMethod,
-    pub start_service: PythonStartServiceMethod,
-    pub initialize_service: PythonInitializeServiceMethod,
-    pub stop_service: PythonStopServiceMethod,
+    pub restart_service: PythonRestartServiceMethod,
+    pub add_service: PythonAddServiceMethod,
     pub execute: PythonExecuteMethod,
     pub artifact_protobuf_spec: PythonArtifactProtobufSpecMethod,
     pub state_hashes: PythonStateHashesMethod,
@@ -104,9 +102,8 @@ impl Default for PythonMethods {
         Self {
             deploy_artifact: default_deploy,
             is_artifact_deployed: default_is_artifact_deployed,
-            start_service: default_start_service,
-            initialize_service: default_initialize_service_method,
-            stop_service: default_stop_service_method,
+            restart_service: default_restart_service,
+            add_service: default_add_service_method,
             execute: default_execute_method,
             artifact_protobuf_spec: default_artifact_protobuf_spec_method,
             state_hashes: default_state_hashes_method,
@@ -173,20 +170,16 @@ unsafe extern "C" fn default_is_artifact_deployed(_artifact: RawArtifactId) -> b
     false
 }
 
-unsafe extern "C" fn default_start_service(_spec: RawInstanceSpec) -> u8 {
+unsafe extern "C" fn default_restart_service(_spec: RawInstanceSpec) -> u8 {
     PythonRuntimeResult::RuntimeNotReady as u8
 }
 
-unsafe extern "C" fn default_initialize_service_method(
+unsafe extern "C" fn default_add_service_method(
     _fork: *const RawIndexAccess,
-    _descriptor: RawInstanceDescriptor,
+    _descriptor: RawInstanceSpec,
     _parameters: *const u8,
     _parameters_len: u64,
 ) -> u8 {
-    PythonRuntimeResult::RuntimeNotReady as u8
-}
-
-unsafe extern "C" fn default_stop_service_method(_descriptor: RawInstanceDescriptor) -> u8 {
     PythonRuntimeResult::RuntimeNotReady as u8
 }
 

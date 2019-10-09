@@ -2,7 +2,6 @@ use std::os::raw::c_void;
 use std::sync::RwLock;
 
 use futures::{Future, IntoFuture};
-// use sysinfo::{Pid, ProcessExt, ProcessStatus, RefreshKind, System, SystemExt};
 
 use exonum::{
     api::ApiContext,
@@ -11,7 +10,7 @@ use exonum::{
     runtime::{
         dispatcher::{DispatcherRef, DispatcherSender},
         ApiChange, ArtifactId, ArtifactProtobufSpec, CallInfo, ExecutionContext, ExecutionError,
-        InstanceDescriptor, InstanceSpec, Runtime, StateHashAggregator,
+        InstanceSpec, Runtime, StateHashAggregator,
     },
 };
 use exonum_merkledb::{Fork, Snapshot};
@@ -22,8 +21,7 @@ use super::{
     python_interface::{BLOCK_SNAPSHOT, PYTHON_INTERFACE},
     types::{
         convert_string, into_ptr_and_len, RawArtifactId, RawArtifactProtobufSpec, RawCallInfo,
-        RawExecutionContext, RawIndexAccess, RawInstanceDescriptor, RawInstanceSpec,
-        RawStateHashAggregator,
+        RawExecutionContext, RawIndexAccess, RawInstanceSpec, RawStateHashAggregator,
     },
 };
 
@@ -106,7 +104,7 @@ impl Runtime for PythonRuntime {
         }
     }
 
-    fn start_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
+    fn restart_service(&mut self, spec: &InstanceSpec) -> Result<(), ExecutionError> {
         self.ensure_runtime()?;
 
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
@@ -117,16 +115,16 @@ impl Runtime for PythonRuntime {
             let python_instance_spec =
                 RawInstanceSpec::from_instance_spec(spec, &instance_name, &artifact_name);
 
-            (python_interface.methods.start_service)(python_instance_spec)
+            (python_interface.methods.restart_service)(python_instance_spec)
         };
 
         PythonRuntimeResult::from_value(result)
     }
 
-    fn initialize_service(
-        &self,
-        fork: &Fork,
-        descriptor: InstanceDescriptor,
+    fn add_service(
+        &mut self,
+        fork: &mut Fork,
+        spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         self.ensure_runtime()?;
@@ -134,36 +132,20 @@ impl Runtime for PythonRuntime {
         let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
 
         let result = unsafe {
-            let name = convert_string(descriptor.name);
-
-            let python_instance_descriptor =
-                RawInstanceDescriptor::from_instance_descriptor(&descriptor, &name);
+            let artifact_name = convert_string(&spec.artifact.name);
+            let instance_name = convert_string(&spec.name);
+            let python_instance_spec =
+                RawInstanceSpec::from_instance_spec(spec, &instance_name, &artifact_name);
 
             let access = RawIndexAccess::Fork(fork);
 
             let (parameters_bytes_ptr, parameters_bytes_len) = into_ptr_and_len(&parameters);
-            (python_interface.methods.initialize_service)(
+            (python_interface.methods.add_service)(
                 &access as *const RawIndexAccess,
-                python_instance_descriptor,
+                python_instance_spec,
                 parameters_bytes_ptr,
                 parameters_bytes_len as u64,
             )
-        };
-
-        PythonRuntimeResult::from_value(result)
-    }
-
-    fn stop_service(&mut self, descriptor: InstanceDescriptor) -> Result<(), ExecutionError> {
-        self.ensure_runtime()?;
-
-        let python_interface = PYTHON_INTERFACE.read().expect("Interface read");
-
-        let result = unsafe {
-            let name = convert_string(descriptor.name);
-            let python_instance_descriptor =
-                RawInstanceDescriptor::from_instance_descriptor(&descriptor, &name);
-
-            (python_interface.methods.stop_service)(python_instance_descriptor)
         };
 
         PythonRuntimeResult::from_value(result)

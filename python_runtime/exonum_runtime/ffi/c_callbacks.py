@@ -3,9 +3,9 @@
 from typing import List, Any, Dict
 import ctypes as c
 
+from exonum_runtime.runtime.types import PythonRuntimeResult
 from .raw_types import (
     RawArtifactId,
-    RawInstanceDescriptor,
     RawInstanceSpec,
     RawCallInfo,
     RawStateHashAggregator,
@@ -15,8 +15,6 @@ from .raw_types import (
     RawIndexAccess,
 )
 from .ffi_provider import RustFFIProvider
-
-from exonum_runtime.runtime.types import PythonRuntimeResult
 
 # Dynamically allocated resources
 #
@@ -50,27 +48,13 @@ def is_artifact_deployed(raw_artifact):  # type: ignore # Signature is one line 
 
 
 @c.CFUNCTYPE(c.c_uint8, RawInstanceSpec)
-def start_service(raw_spec):  # type: ignore # Signature is one line above.
+def restart_service(raw_spec):  # type: ignore # Signature is one line above.
     """Function called from Rust to indicate an service start request."""
     instance_spec = raw_spec.into_instance_spec()
 
     ffi = RustFFIProvider.instance()
 
     result = ffi.runtime().start_instance(instance_spec)
-
-    return result.value
-
-
-@c.CFUNCTYPE(c.c_uint8, RawIndexAccess, RawInstanceDescriptor, c.POINTER(c.c_uint8), c.c_uint32)
-def initialize_service(access, descriptor, parameters, parameters_len):  # type: ignore # Signature is one line above.
-    """Configure service instance"""
-    instance_descriptor = descriptor.into_instance_descriptor()
-
-    parameters_bytes = bytes(parameters[:parameters_len])
-
-    ffi = RustFFIProvider.instance()
-
-    result = ffi.runtime().initialize_service(access, instance_descriptor, parameters_bytes)
 
     if isinstance(result, PythonRuntimeResult):
         return result.value
@@ -79,16 +63,22 @@ def initialize_service(access, descriptor, parameters, parameters_len):  # type:
     return PythonRuntimeResult.SERVICE_ERRORS_START + result.code
 
 
-@c.CFUNCTYPE(c.c_uint8, RawInstanceDescriptor)
-def stop_service(descriptor):  # type: ignore # Signature is one line above.
-    """Stop service instance"""
-    instance_descriptor = descriptor.into_instance_descriptor()
+@c.CFUNCTYPE(c.c_uint8, RawIndexAccess, RawInstanceSpec, c.POINTER(c.c_uint8), c.c_uint32)
+def add_service(access, raw_spec, parameters, parameters_len):  # type: ignore # Signature is one line above.
+    """Configure service instance"""
+    instance_spec = raw_spec.into_instance_spec()
+
+    parameters_bytes = bytes(parameters[:parameters_len])
 
     ffi = RustFFIProvider.instance()
 
-    result = ffi.runtime().stop_service(instance_descriptor)
+    result = ffi.runtime().add_service(access, instance_spec, parameters_bytes)
 
-    return result.value
+    if isinstance(result, PythonRuntimeResult):
+        return result.value
+
+    # ServiceError
+    return PythonRuntimeResult.SERVICE_ERRORS_START + result.code
 
 
 @c.CFUNCTYPE(c.c_uint8, RawExecutionContext, RawCallInfo, c.POINTER(c.c_uint8), c.c_uint32)
@@ -192,9 +182,8 @@ def build_callbacks() -> RawPythonMethods:
     return RawPythonMethods(
         deploy_artifact=c.cast(deploy_artifact, c.c_void_p),
         is_artifact_deployed=c.cast(is_artifact_deployed, c.c_void_p),
-        start_service=c.cast(start_service, c.c_void_p),
-        initialize_service=c.cast(initialize_service, c.c_void_p),
-        stop_service=c.cast(stop_service, c.c_void_p),
+        restart_service=c.cast(restart_service, c.c_void_p),
+        add_service=c.cast(add_service, c.c_void_p),
         execute=c.cast(execute, c.c_void_p),
         artifact_protobuf_spec=c.cast(artifact_protobuf_spec, c.c_void_p),
         state_hashes=c.cast(state_hashes, c.c_void_p),

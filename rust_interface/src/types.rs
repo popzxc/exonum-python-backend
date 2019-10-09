@@ -3,8 +3,8 @@ use std::os::raw::c_char;
 
 use exonum::crypto::Hash;
 use exonum::runtime::{
-    ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceDescriptor,
-    InstanceId, InstanceSpec, ProtoSourceFile, StateHashAggregator,
+    ArtifactId, ArtifactProtobufSpec, CallInfo, Caller, ExecutionContext, InstanceId, InstanceSpec,
+    ProtoSourceFile, StateHashAggregator,
 };
 
 use exonum_merkledb::{Fork, Snapshot};
@@ -87,24 +87,6 @@ impl From<RawInstanceSpec> for InstanceSpec {
             id: instance_spec.id,
             name: instance_name,
             artifact: ArtifactId::from(instance_spec.artifact),
-        }
-    }
-}
-
-#[repr(C)]
-pub struct RawInstanceDescriptor {
-    pub id: u32,
-    pub name: *const c_char,
-}
-
-impl RawInstanceDescriptor {
-    pub unsafe fn from_instance_descriptor(
-        descriptor: &InstanceDescriptor,
-        name: &CString,
-    ) -> RawInstanceDescriptor {
-        RawInstanceDescriptor {
-            name: name.as_ptr(),
-            id: descriptor.id,
         }
     }
 }

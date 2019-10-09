@@ -61,13 +61,6 @@ class DeploymentResult(NamedTuple):
     artifact_id: ArtifactId
 
 
-class InstanceDescriptor(NamedTuple):
-    """Service Instance descriptor."""
-
-    instance_id: InstanceId
-    name: str
-
-
 class CallInfo(NamedTuple):
     """Information about service method call."""
 

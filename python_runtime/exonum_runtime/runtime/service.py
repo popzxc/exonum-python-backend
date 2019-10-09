@@ -79,10 +79,17 @@ class Service(Named, metaclass=abc.ABCMeta):
 
     __routing_table: Dict[str, Dict[int, _TransactionRoute]] = dict()
 
-    def __init__(self, module_name: str, fork: Fork, name: str, config: bytes):
+    def __init__(self, module_name: str, name: str, fork: Optional[Fork], config: Optional[bytes]):
         self.__instance_name = name
         self.__config = config
         self.__module_name = module_name
+
+        # If we've already initialized the service, we won't have to initialize it again.
+        if config is None:
+            return
+
+        # It's not legal to provide config, but not provide fork.
+        assert fork is not None
 
         try:
             service_module = importlib.import_module(f"{self.__module_name}.proto.service_pb2")

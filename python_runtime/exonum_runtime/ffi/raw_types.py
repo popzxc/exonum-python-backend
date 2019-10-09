@@ -8,7 +8,6 @@ from exonum_runtime.runtime.types import (
     InstanceSpec,
     StateHashAggregator,
     ArtifactProtobufSpec,
-    InstanceDescriptor,
     CallInfo,
     CallerService,
     CallerTransaction,
@@ -27,9 +26,8 @@ class RawPythonMethods(c.Structure):
     _fields_ = [
         ("deploy_artifact", c.c_void_p),
         ("is_artifact_deployed", c.c_void_p),
-        ("start_service", c.c_void_p),
-        ("initialize_service", c.c_void_p),
-        ("stop_service", c.c_void_p),
+        ("restart_service", c.c_void_p),
+        ("add_service", c.c_void_p),
         ("execute", c.c_void_p),
         ("artifact_protobuf_spec", c.c_void_p),
         ("state_hashes", c.c_void_p),
@@ -76,19 +74,6 @@ class RawInstanceSpec(c.Structure):
         """Converts python version of ArtifactID into c-compatible."""
         raw_artifact = RawArtifactId.from_artifact_id(instance_spec.artifact)
         return cls(instance_id=int(instance_spec.instance_id), name=instance_spec.name, artifact=raw_artifact)
-
-
-class RawInstanceDescriptor(c.Structure):
-    """Instance descriptor."""
-
-    _fields_ = [("id", c.c_uint32), ("name", c.c_char_p)]
-
-    def into_instance_descriptor(self) -> InstanceDescriptor:
-        """Converts c-like artifact id into python-friendly form."""
-        name = str(c.string_at(self.name), "utf-8")
-        instance_id = InstanceId(self.id)
-
-        return InstanceDescriptor(instance_id, name)
 
 
 class RawCallInfo(c.Structure):

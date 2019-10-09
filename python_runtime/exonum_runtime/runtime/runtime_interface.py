@@ -6,7 +6,6 @@ import abc
 from .types import (
     ArtifactId,
     InstanceSpec,
-    InstanceDescriptor,
     PythonRuntimeResult,
     StateHashAggregator,
     CallInfo,
@@ -30,18 +29,14 @@ class RuntimeInterface(metaclass=abc.ABCMeta):
         """Returns True if artifact is deployed and false otherwise."""
 
     @abc.abstractmethod
-    def start_instance(self, instance_spec: InstanceSpec) -> PythonRuntimeResult:
-        """Starts the instance with the provided name."""
+    def restart_instance(self, instance_spec: InstanceSpec) -> Union[PythonRuntimeResult, ServiceError]:
+        """Starts the instance with the provided name (assuming that it's already has the parameters initialized)."""
 
     @abc.abstractmethod
-    def initialize_service(
-        self, access: RawIndexAccess, instance: InstanceDescriptor, parameters: bytes
+    def add_service(
+        self, access: RawIndexAccess, instance_spec: InstanceSpec, parameters: bytes
     ) -> Union[PythonRuntimeResult, ServiceError]:
         """Initialize the instance."""
-
-    @abc.abstractmethod
-    def stop_service(self, instance: InstanceDescriptor) -> PythonRuntimeResult:
-        """Stop the service instance."""
 
     @abc.abstractmethod
     def execute(

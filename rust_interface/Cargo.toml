@@ -14,8 +14,8 @@ lazy_static = "1.0.1"
 log = "0.4"
 failure = "0.1.5"
 
-exonum = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }
-exonum-derive = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }
-exonum-merkledb = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }
-exonum-supervisor = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }
-exonum-cli = { git = "https://github.com/exonum/exonum.git", branch="dynamic_services" }
+exonum = { git = "https://github.com/exonum/exonum.git", rev="56ca9e79f6cce8d9f85f63e81adc4d3c2b2ac563" }
+exonum-derive = { git = "https://github.com/exonum/exonum.git", rev="56ca9e79f6cce8d9f85f63e81adc4d3c2b2ac563" }
+exonum-merkledb = { git = "https://github.com/exonum/exonum.git", rev="56ca9e79f6cce8d9f85f63e81adc4d3c2b2ac563" }
+exonum-supervisor = { git = "https://github.com/exonum/exonum.git", rev="56ca9e79f6cce8d9f85f63e81adc4d3c2b2ac563" }
+exonum-cli = { git = "https://github.com/exonum/exonum.git", rev="56ca9e79f6cce8d9f85f63e81adc4d3c2b2ac563" }
